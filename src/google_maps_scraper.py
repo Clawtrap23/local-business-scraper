@@ -4,6 +4,7 @@ import csv
 import logging
 import re
 import sys
+import urllib.parse
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Iterable, List
@@ -43,6 +44,16 @@ class Business:
     maps_url: str = ""
 
 
+def clean_text(value: str) -> str:
+    if not value:
+        return ""
+    value = value.replace("\u202f", " ")
+    value = re.sub(r"[\ue000-\uf8ff]", "", value)
+    value = value.replace("", "").replace("", "").replace("", "").replace("", "")
+    value = re.sub(r"\s+", " ", value.replace("\n", " ")).strip()
+    return value
+
+
 class GoogleMapsScraper:
     def __init__(self, headless: bool = True):
         self.headless = headless
@@ -79,7 +90,7 @@ class GoogleMapsScraper:
 
     @staticmethod
     def _open_search(page: Page, query: str) -> None:
-        encoded_query = query.strip().replace(" ", "+")
+        encoded_query = urllib.parse.quote_plus(query.strip())
         page.goto(f"https://www.google.com/maps/search/{encoded_query}", timeout=60000)
         page.wait_for_load_state("domcontentloaded")
         page.wait_for_timeout(5000)
@@ -97,6 +108,8 @@ class GoogleMapsScraper:
             pass
         previous = -1
         stable_rounds = 0
+        max_scrolls = max(8, total * 2)
+        scrolls = 0
         while True:
             anchors = page.locator(anchor_selector)
             count = anchors.count()
@@ -107,14 +120,15 @@ class GoogleMapsScraper:
                 stable_rounds += 1
             else:
                 stable_rounds = 0
-            if stable_rounds >= 3:
+            if stable_rounds >= 4 or scrolls >= max_scrolls:
                 break
             previous = count
+            scrolls += 1
             try:
-                page.mouse.wheel(0, 12000)
+                page.mouse.wheel(0, 18000)
             except Exception:
                 pass
-            page.wait_for_timeout(2000)
+            page.wait_for_timeout(2500)
         hrefs = []
         for i in range(min(total, page.locator(anchor_selector).count())):
             try:
@@ -130,7 +144,7 @@ class GoogleMapsScraper:
         try:
             locator = page.locator(selector)
             if locator.count() > 0:
-                return locator.first.inner_text(timeout=4000).strip()
+                return clean_text(locator.first.inner_text(timeout=4000).strip())
         except Exception:
             return ""
         return ""
@@ -141,7 +155,7 @@ class GoogleMapsScraper:
             locator = page.locator(selector)
             if locator.count() > 0:
                 value = locator.first.get_attribute(attr, timeout=4000)
-                return (value or "").strip()
+                return clean_text((value or "").strip())
         except Exception:
             return ""
         return ""
@@ -155,8 +169,8 @@ class GoogleMapsScraper:
         address = self._text(page, 'button[data-item-id="address"] .fontBodyMedium, button[data-item-id="address"]')
         website = self._text(page, 'a[data-item-id="authority"] .fontBodyMedium, a[data-item-id="authority"]')
         phone = self._text(page, 'button[data-item-id^="phone:"] .fontBodyMedium, button[data-item-id^="phone:"]')
-        rating = self._attr(page, 'div[role="main"] span[aria-hidden="true"]', 'aria-label') or self._text(page, 'div[role="main"] span[aria-hidden="true"]')
-        reviews_count = self._attr(page, 'span[aria-label*="reviews"]', 'aria-label') or self._text(page, 'span[aria-label*="reviews"]')
+        rating = self._text(page, 'div.F7nice span[aria-hidden="true"], span.ceNzKf[role="img"]')
+        reviews_count = self._attr(page, 'button[jsaction*="pane.rating.moreReviews"]', 'aria-label') or self._text(page, 'button[jsaction*="pane.rating.moreReviews"]')
         hours = self._text(page, 'button[data-item-id*="oh"] .fontBodyMedium, div.MkV9 span.ZDu9vd span:nth-child(2)')
 
         service_bits = []
@@ -166,7 +180,7 @@ class GoogleMapsScraper:
                 for i in range(min(loc.count(), 4)):
                     text = loc.nth(i).inner_text(timeout=2000).strip()
                     if text:
-                        service_bits.append(text.replace('\n', ' | '))
+                        service_bits.append(clean_text(text.replace('\n', ' | ')))
             except Exception:
                 continue
 

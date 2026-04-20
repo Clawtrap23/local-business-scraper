@@ -20,26 +20,39 @@ It exports one row per business with:
 - rough website quality heuristic
 - coordinates and distance from the search center
 
-## Setup
+## Setup with Conda
 
-Recommended:
+Miniconda is installed at:
 
 ```bash
-python3 -m pip install --user -r requirements.txt
+/home/profile1/miniconda3
 ```
 
-If your machine does not have `pip` yet:
+Create or use the dedicated environment:
 
 ```bash
-sudo apt update
-sudo apt install -y python3-pip
-python3 -m pip install --user -r requirements.txt
+/home/profile1/miniconda3/bin/conda activate local-business-scraper
+```
+
+If `conda activate` is not initialized in your shell yet, use either:
+
+```bash
+source /home/profile1/miniconda3/etc/profile.d/conda.sh
+conda activate local-business-scraper
+```
+
+or run the script directly with the env Python:
+
+```bash
+/home/profile1/miniconda3/envs/local-business-scraper/bin/python run.py "Brisbane CBD" --radius-km 2
 ```
 
 ## Usage
 
 ```bash
-python src/business_scraper.py "Brisbane CBD" --radius-km 2
+source /home/profile1/miniconda3/etc/profile.d/conda.sh
+conda activate local-business-scraper
+python run.py "Brisbane CBD" --radius-km 2
 ```
 
 Outputs go to `output/`:
@@ -55,6 +68,13 @@ Outputs go to `output/`:
   - no website => `No website listed`
   - `https` => `Likely modern`
   - otherwise => `Possibly older/basic`
+
+## Environment contents
+
+The `local-business-scraper` conda environment includes:
+- Python 3.11
+- requests
+- openpyxl
 
 ## Next improvements
 

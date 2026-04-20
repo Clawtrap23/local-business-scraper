@@ -1,0 +1,7 @@
+name: local-business-scraper
+channels:
+  - defaults
+dependencies:
+  - python=3.11
+  - requests
+  - openpyxl

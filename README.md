@@ -49,10 +49,20 @@ or run the script directly with the env Python:
 
 ## Usage
 
+### OpenStreetMap mode
+
 ```bash
 source /home/profile1/miniconda3/etc/profile.d/conda.sh
 conda activate local-business-scraper
 python run.py "Brisbane CBD" --radius-km 2
+```
+
+### Google Maps mode
+
+```bash
+source /home/profile1/miniconda3/etc/profile.d/conda.sh
+conda activate local-business-scraper
+python run.py google "plumbers in Brisbane CBD" --total 10
 ```
 
 Outputs go to `output/`:
@@ -75,6 +85,20 @@ The `local-business-scraper` conda environment includes:
 - Python 3.11
 - requests
 - openpyxl
+- Playwright
+
+Install the browser runtime once:
+
+```bash
+/home/profile1/miniconda3/envs/local-business-scraper/bin/python -m playwright install chromium
+```
+
+## Notes on Google Maps mode
+
+- It is designed for headless server execution.
+- It is still more brittle than an official API.
+- Google Maps DOM changes can require selector updates.
+- It is a practical discovery layer for tradies and small local businesses.
 
 ## Next improvements
 

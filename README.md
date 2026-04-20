@@ -1,73 +1,137 @@
 # local-business-scraper
 
-Collect local business data inside a radius around a location and export it to CSV and Excel.
+A Google Maps based local business and tradies scraping pipeline for Brisbane-style suburb-by-suburb lead collection.
 
-## What it does
+## What this project is for
 
-This first version uses:
-- Nominatim for geocoding a place like `Brisbane CBD`
-- OpenStreetMap Overpass for nearby business/place data
+This project is designed to collect business information for:
+- plumbers
+- locksmiths
+- carpenters
+- roofers
+- solar installers
+- waterproofing businesses
+- electricians
+- smart home installers
+- security installers
+- and other local service businesses / tradies
 
-It exports one row per business with:
-- business name
-- category/type
-- address/location
-- phone number
-- website URL
-- email address
-- business size (rough heuristic)
-- whether a website exists
-- rough website quality heuristic
-- coordinates and distance from the search center
+The main use case is:
+- pick a target area such as **Brisbane CBD**
+- search nearby suburbs one by one
+- run multiple tradie/business queries
+- collect business listings from **Google Maps**
+- remove duplicates
+- export the final result to **CSV** and **Excel**
 
-## Setup with Conda
+## Important status
 
-Miniconda is installed at:
+### Main pipeline: Google Maps
+This is the **current recommended pipeline**.
 
-```bash
-/home/profile1/miniconda3
-```
+Use this for real work.
 
-Create or use the dedicated environment:
+### Old pipeline: OpenStreetMap / Overpass
+This is still present in the repo, but it is now **legacy / mostly obsolete for the intended use case**.
 
-```bash
-/home/profile1/miniconda3/bin/conda activate local-business-scraper
-```
+Why it is no longer the preferred option:
+- weaker coverage for tradies and service businesses
+- misses many websites and real businesses
+- better for generic map POIs than for lead generation
 
-If `conda activate` is not initialized in your shell yet, use either:
+You can still run it, but for tradies and small-business prospecting, use the **Google Maps pipeline** instead.
+
+## Project structure
+
+### Main files
+
+- `run.py`
+  - main entry point
+  - lets you run the project in different modes
+
+- `src/google_maps_scraper.py`
+  - single-query Google Maps scraper
+  - useful for tests and one-off searches like:
+    - `plumbers in Brisbane CBD`
+
+- `src/tradie_pipeline.py`
+  - the main multi-suburb pipeline
+  - reads a suburb list and a keyword list
+  - runs many Google Maps searches
+  - deduplicates results
+  - exports final spreadsheet files
+
+- `src/business_scraper.py`
+  - old OpenStreetMap-based pipeline
+  - kept for reference / fallback
+  - no longer the preferred workflow
+
+### Config files
+
+- `config/brisbane-cbd-nearby-suburbs.txt`
+  - editable list of suburbs to search
+  - one suburb per line
+  - this is where you change the target suburb coverage in future
+
+- `config/tradie-keywords.txt`
+  - editable list of tradie / service keywords
+  - one keyword per line
+  - this is where you add or remove categories
+
+### Output files
+
+Generated files are written to `output/`, for example:
+- `google-maps-results.csv`
+- `google-maps-results.xlsx`
+- `tradies-brisbane-cbd-nearby-suburbs.csv`
+- `tradies-brisbane-cbd-nearby-suburbs.xlsx`
+
+## Setup
+
+This project is intended to run in the dedicated Conda environment created on this machine.
+
+### Conda environment
 
 ```bash
 source /home/profile1/miniconda3/etc/profile.d/conda.sh
 conda activate local-business-scraper
 ```
 
-or run the script directly with the env Python:
+If the environment does not exist yet, create/update it from:
 
 ```bash
-/home/profile1/miniconda3/envs/local-business-scraper/bin/python run.py "Brisbane CBD" --radius-km 2
+conda env create -f environment.yml
 ```
 
-## Usage
-
-### OpenStreetMap mode
+or, if it already exists:
 
 ```bash
-source /home/profile1/miniconda3/etc/profile.d/conda.sh
-conda activate local-business-scraper
-python run.py "Brisbane CBD" --radius-km 2
+conda env update -f environment.yml --prune
 ```
 
-### Google Maps mode
+### Install Playwright browser runtime
+
+Run this once:
 
 ```bash
-source /home/profile1/miniconda3/etc/profile.d/conda.sh
-conda activate local-business-scraper
-python run.py google "plumbers in Brisbane CBD" --total 10
+/home/profile1/miniconda3/envs/local-business-scraper/bin/python -m playwright install chromium
 ```
 
-### Multi-suburb tradies pipeline
+## How to run
 
-This mode reads an editable suburb list and an editable tradie keyword list, runs Google Maps searches across all combinations, then deduplicates the final dataset.
+## 1. Recommended: multi-suburb tradies pipeline
+
+This is the main production-style workflow.
+
+It:
+- reads the suburb list from `config/brisbane-cbd-nearby-suburbs.txt`
+- reads tradie keywords from `config/tradie-keywords.txt`
+- runs all keyword × suburb searches in Google Maps
+- merges the results
+- removes duplicates
+- writes CSV and Excel output
+
+Run:
 
 ```bash
 source /home/profile1/miniconda3/etc/profile.d/conda.sh
@@ -75,48 +139,59 @@ conda activate local-business-scraper
 python run.py tradies --total-per-query 8
 ```
 
-Editable input files:
-- `config/brisbane-cbd-nearby-suburbs.txt`
-- `config/tradie-keywords.txt`
+### What `--total-per-query` means
+It is the maximum number of Google Maps listings to collect for each search.
 
-Outputs go to `output/`:
-- `brisbane-cbd.csv`
-- `brisbane-cbd.xlsx`
+For example, with:
+- 30 suburbs
+- 20 keywords
+- `--total-per-query 8`
 
-## Notes
+The pipeline may attempt up to:
+- 30 × 20 × 8 listing slots
 
-- This does **not** scrape Google Maps.
-- Coverage depends on OpenStreetMap data quality in the target area.
-- Email addresses and business size are often missing in map data, so those fields are best-effort.
-- Website quality is a simple heuristic for now:
-  - no website => `No website listed`
-  - `https` => `Likely modern`
-  - otherwise => `Possibly older/basic`
+In practice, deduplication will reduce the final output.
 
-## Environment contents
+## 2. Single Google Maps query mode
 
-The `local-business-scraper` conda environment includes:
-- Python 3.11
-- requests
-- openpyxl
-- Playwright
+Use this when you want to test one search manually.
 
-Install the browser runtime once:
+Example:
 
 ```bash
-/home/profile1/miniconda3/envs/local-business-scraper/bin/python -m playwright install chromium
+source /home/profile1/miniconda3/etc/profile.d/conda.sh
+conda activate local-business-scraper
+python run.py google "plumbers in Brisbane CBD" --total 12
 ```
 
-## Notes on Google Maps mode
+This writes:
+- `output/google-maps-results.csv`
+- `output/google-maps-results.xlsx`
 
-- It is designed for headless server execution.
-- It is still more brittle than an official API.
-- Google Maps DOM changes can require selector updates.
-- It is a practical discovery layer for tradies and small local businesses.
+## 3. Legacy OSM mode
 
-## Current Brisbane CBD nearby suburb list
+This mode is still available, but it is no longer the recommended path.
 
-The project currently includes this 30-suburb editable list around Brisbane CBD:
+```bash
+source /home/profile1/miniconda3/etc/profile.d/conda.sh
+conda activate local-business-scraper
+python run.py "Brisbane CBD" --radius-km 2
+```
+
+Use it only if you specifically want the old OpenStreetMap-based approach.
+
+## Editable files you will likely change
+
+### Suburb list
+Edit:
+
+```text
+config/brisbane-cbd-nearby-suburbs.txt
+```
+
+One suburb per line.
+
+Current included suburbs:
 - Brisbane City
 - Spring Hill
 - Petrie Terrace
@@ -148,11 +223,71 @@ The project currently includes this 30-suburb editable list around Brisbane CBD:
 - Annerley
 - Greenslopes
 
-## Next improvements
+### Tradie keyword list
+Edit:
 
-Good next steps if you want a stronger lead-gen dataset:
-- crawl each website homepage/contact page to extract emails more reliably
-- add business opening hours
-- add more categories
-- enrich with Google Places or another paid/local-business API if you want broader coverage
-- improve website quality scoring with live page inspection
+```text
+config/tradie-keywords.txt
+```
+
+One keyword per line.
+
+Examples already included:
+- plumbers
+- locksmiths
+- carpenters
+- solar panel installers
+- waterproofing services
+- roofers
+- electricians
+- smart home installers
+- security system installers
+- stone masons
+- asbestos removal
+- elevator technicians
+
+## What the output contains
+
+Depending on the Google Maps listing, output rows may include:
+- query used
+- business name
+- category
+- address
+- website
+- phone number
+- rating
+- review count
+- service notes
+- opening hours
+- Google Maps listing URL
+
+## Known limitations
+
+- Google Maps scraping is more useful than the old OSM pipeline, but it is also more brittle.
+- Google can change page structure at any time.
+- Some businesses may appear in multiple suburb/keyword searches, so deduplication is necessary.
+- Review count extraction is still weaker than name/website/phone extraction.
+- Email extraction is not yet part of the main pipeline.
+
+## Recommended workflow
+
+If you want the best current result:
+
+1. edit suburb list if needed
+2. edit tradie keyword list if needed
+3. run:
+
+```bash
+python run.py tradies --total-per-query 8
+```
+
+4. inspect the final deduplicated CSV/XLSX in `output/`
+
+## Future improvements
+
+Planned / useful next upgrades:
+- visit official websites to extract email addresses
+- improve review count extraction
+- stronger deduplication logic
+- add confidence/source scoring
+- optionally swap discovery over to Google Places API for more stability

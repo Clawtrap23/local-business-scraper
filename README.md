@@ -65,6 +65,20 @@ conda activate local-business-scraper
 python run.py google "plumbers in Brisbane CBD" --total 10
 ```
 
+### Multi-suburb tradies pipeline
+
+This mode reads an editable suburb list and an editable tradie keyword list, runs Google Maps searches across all combinations, then deduplicates the final dataset.
+
+```bash
+source /home/profile1/miniconda3/etc/profile.d/conda.sh
+conda activate local-business-scraper
+python run.py tradies --total-per-query 8
+```
+
+Editable input files:
+- `config/brisbane-cbd-nearby-suburbs.txt`
+- `config/tradie-keywords.txt`
+
 Outputs go to `output/`:
 - `brisbane-cbd.csv`
 - `brisbane-cbd.xlsx`
@@ -99,6 +113,40 @@ Install the browser runtime once:
 - It is still more brittle than an official API.
 - Google Maps DOM changes can require selector updates.
 - It is a practical discovery layer for tradies and small local businesses.
+
+## Current Brisbane CBD nearby suburb list
+
+The project currently includes this 30-suburb editable list around Brisbane CBD:
+- Brisbane City
+- Spring Hill
+- Petrie Terrace
+- Fortitude Valley
+- New Farm
+- Teneriffe
+- Newstead
+- Kangaroo Point
+- South Brisbane
+- West End
+- Highgate Hill
+- Milton
+- Paddington
+- Red Hill
+- Herston
+- Bowen Hills
+- Woolloongabba
+- East Brisbane
+- Auchenflower
+- Toowong
+- Norman Park
+- Bulimba
+- Hawthorne
+- Balmoral
+- Ashgrove
+- Kelvin Grove
+- St Lucia
+- Dutton Park
+- Annerley
+- Greenslopes
 
 ## Next improvements
 

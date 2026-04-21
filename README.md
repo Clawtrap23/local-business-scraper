@@ -344,10 +344,80 @@ python run.py tradies --total-per-query 8
 
 4. inspect the final deduplicated CSV/XLSX in `output/`
 
+## Enrichment layer
+
+A separate enrichment script is now included.
+
+Purpose:
+- take an existing scraped CSV
+- visit each listed website
+- extract extra signals from the website itself
+
+Run it like this:
+
+```bash
+source /home/profile1/miniconda3/etc/profile.d/conda.sh
+conda activate local-business-scraper
+python run.py enrich output/tradies-brisbane-cbd-nearby-suburbs.csv --output-csv output/enriched-results.csv --output-xlsx output/enriched-results.xlsx
+```
+
+Current enrichment fields include:
+- `enriched_final_url`
+- `enriched_page_title`
+- `enriched_emails_found`
+- `enriched_phones_found`
+- `enriched_contact_hints`
+- `enriched_social_links`
+- `enriched_directory_mentions`
+- `enriched_notes`
+
+## Enrichment ideas from here
+
+Your instinct is right. The best next enrichment layers are:
+
+### 1. Visit each official website
+This is the best first move.
+
+Why:
+- high confidence source
+- can extract emails, forms, booking/quote intent, socials, and trust signals
+- can judge whether the site looks weak or modern
+
+### 2. For businesses with no website, search for external presence
+For smaller businesses with no official site, useful fallback sources are:
+- Google search results
+- Instagram
+- Facebook
+- TripAdvisor
+- Yelp
+- Yellow Pages
+- local trade directories like hipages / Oneflare
+
+This can help identify businesses that:
+- truly have no website
+- only rely on social media
+- have directory-only presence
+- are still good targets for a website + CRM offer
+
+### 3. Split the sales opportunity into two types
+This is probably the smartest commercial framing:
+
+- **Website lead**
+  - no website
+  - weak/outdated website
+
+- **CRM lead**
+  - website exists
+  - but weak lead capture, no quote funnel, no automation, weak follow-up
+
+That means some businesses with modern-ish websites could still be valuable CRM leads.
+
 ## Future improvements
 
 Planned / useful next upgrades:
-- visit official websites to extract email addresses
+- improve enrichment for email discovery
+- add deeper website crawling for contact/about pages
+- search Google / social / directory presence for no-website businesses
 - improve review count extraction
 - stronger deduplication logic
 - add confidence/source scoring

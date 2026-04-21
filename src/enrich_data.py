@@ -127,13 +127,51 @@ def extract_all_links(base_url: str, html: str) -> List[str]:
     return deduped
 
 
+def normalize_social_url(key: str, url: str) -> str:
+    parsed = urlparse(url)
+    path = parsed.path.strip('/')
+    if not path:
+        return url
+
+    if key == 'facebook':
+        parts = [p for p in path.split('/') if p]
+        if parts and parts[0] in {'profile.php'}:
+            return f'{parsed.scheme}://{parsed.netloc}/{parts[0]}' + (f'?{parsed.query}' if parsed.query else '')
+        if parts:
+            return f'{parsed.scheme}://{parsed.netloc}/{parts[0]}/'
+
+    if key == 'instagram':
+        parts = [p for p in path.split('/') if p and p not in {'reel', 'p', 'tv', 'stories'}]
+        if parts:
+            return f'{parsed.scheme}://{parsed.netloc}/{parts[0]}/'
+
+    if key == 'linkedin':
+        parts = [p for p in path.split('/') if p]
+        if len(parts) >= 2 and parts[0] in {'company', 'in', 'school'}:
+            return f'{parsed.scheme}://{parsed.netloc}/{parts[0]}/{parts[1]}/'
+
+    if key == 'youtube':
+        parts = [p for p in path.split('/') if p]
+        if len(parts) >= 2 and parts[0] in {'@', 'channel', 'c', 'user'}:
+            return f'{parsed.scheme}://{parsed.netloc}/{parts[0]}/{parts[1]}'
+        if parts and parts[0].startswith('@'):
+            return f'{parsed.scheme}://{parsed.netloc}/{parts[0]}'
+
+    if key == 'tiktok':
+        parts = [p for p in path.split('/') if p and p not in {'video'}]
+        if parts and parts[0].startswith('@'):
+            return f'{parsed.scheme}://{parsed.netloc}/{parts[0]}'
+
+    return f'{parsed.scheme}://{parsed.netloc}{parsed.path}' + (f'?{parsed.query}' if parsed.query and key == 'facebook' and 'profile.php' in parsed.path else '')
+
+
 def extract_social_urls(base_url: str, html: str) -> Dict[str, str]:
     social_urls = {key: "" for key in SOCIAL_DOMAINS}
     for link in extract_all_links(base_url, html):
         lowered = link.lower()
         for key, domain in SOCIAL_DOMAINS.items():
             if domain in lowered and not social_urls[key]:
-                social_urls[key] = link
+                social_urls[key] = normalize_social_url(key, link)
     return social_urls
 
 

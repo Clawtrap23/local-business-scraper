@@ -369,7 +369,15 @@ Current enrichment fields include:
 - `enriched_contact_hints`
 - `enriched_social_links`
 - `enriched_directory_mentions`
+- `enriched_deep_pages_checked`
+- `enriched_deep_page_urls`
 - `enriched_notes`
+
+The enrichment step now also:
+- follows key internal pages like contact/about/quote/services
+- extracts explicit `mailto:` links
+- extracts explicit `tel:` links
+- filters some obvious phone-number noise better than before
 
 ## Enrichment ideas from here
 
@@ -415,8 +423,6 @@ That means some businesses with modern-ish websites could still be valuable CRM 
 ## Future improvements
 
 Planned / useful next upgrades:
-- improve enrichment for email discovery
-- add deeper website crawling for contact/about pages
 - search Google / social / directory presence for no-website businesses
 - improve review count extraction
 - stronger deduplication logic

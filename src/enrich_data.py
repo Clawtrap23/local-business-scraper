@@ -4,7 +4,7 @@ import csv
 import re
 from pathlib import Path
 from typing import Dict, List, Set
-from urllib.parse import urljoin, urlparse
+from urllib.parse import unquote, urljoin, urlparse
 
 import requests
 from openpyxl import Workbook
@@ -15,6 +15,8 @@ EMAIL_RE = re.compile(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", re.I)
 PHONE_RE = re.compile(r"\+?\d[\d\s().-]{7,}\d")
 HREF_RE = re.compile(r"href=[\"']([^\"'#]+)[\"']", re.I)
 EMAIL_CLEAN_RE = re.compile(r"^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$", re.I)
+TEL_RE = re.compile(r"tel:([^\"'>\s]+)", re.I)
+MAILTO_RE = re.compile(r"mailto:([^\"'>\s?]+)", re.I)
 
 CONTACT_HINTS = ["contact", "quote", "book", "booking", "enquiry", "inquiry", "service"]
 SOCIAL_HINTS = ["facebook.com", "instagram.com", "linkedin.com", "youtube.com", "tiktok.com"]
@@ -49,23 +51,43 @@ def extract_title(html: str) -> str:
 def extract_emails(html: str) -> Set[str]:
     found = set()
     for email in EMAIL_RE.findall(html):
-        email = email.strip()
+        email = email.strip().strip('.,;:')
         if not EMAIL_CLEAN_RE.match(email):
             continue
         if any(email.lower().endswith(ext) for ext in ['.png', '.jpg', '.jpeg', '.svg', '.webp', '.gif']):
             continue
         found.add(email)
+    for raw in MAILTO_RE.findall(html):
+        email = unquote(raw).strip().strip('.,;:')
+        if EMAIL_CLEAN_RE.match(email):
+            found.add(email)
     return found
+
+
+def normalize_phone(value: str) -> str:
+    value = unquote(value).strip()
+    value = re.sub(r"[A-Za-z]", "", value)
+    value = re.sub(r"\s+", " ", value)
+    digits = re.sub(r"\D", "", value)
+    if len(digits) < 8 or len(digits) > 15:
+        return ""
+    if digits.startswith("61") and not value.startswith("+"):
+        return f"+{digits}"
+    if value.startswith("+"):
+        return "+" + digits
+    return value.strip()
 
 
 def extract_phones(html: str) -> Set[str]:
     cleaned = set()
     for raw in PHONE_RE.findall(html):
-        value = raw.strip()
-        digits = re.sub(r'\D', '', value)
-        if len(digits) < 8 or len(digits) > 15:
-            continue
-        cleaned.add(value)
+        phone = normalize_phone(raw)
+        if phone:
+            cleaned.add(phone)
+    for raw in TEL_RE.findall(html):
+        phone = normalize_phone(raw)
+        if phone:
+            cleaned.add(phone)
     return cleaned
 
 

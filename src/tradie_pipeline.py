@@ -8,6 +8,7 @@ from typing import List, Set, Tuple
 from openpyxl import Workbook
 
 from src.google_maps_scraper import Business, GoogleMapsScraper, clean_text
+from src.lead_scoring import classify_website
 
 DEFAULT_SUBURBS_FILE = "config/brisbane-cbd-nearby-suburbs.txt"
 DEFAULT_KEYWORDS_FILE = "config/tradie-keywords.txt"
@@ -82,14 +83,29 @@ def main() -> int:
             print(f"Running: {query}")
             all_rows.extend(scraper.scrape_query(query, args.total_per_query))
     deduped = dedupe_businesses(all_rows)
+    audited: List[Business] = []
+    for row in deduped:
+        audit = classify_website(row)
+        row.website_status = audit.website_status
+        row.website_quality = audit.website_quality
+        row.website_quality_score = str(audit.website_quality_score)
+        row.website_notes = audit.website_notes
+        row.has_contact_form = audit.has_contact_form
+        row.has_quote_intent = audit.has_quote_intent
+        row.has_recent_year_signal = audit.has_recent_year_signal
+        row.lead_score = str(audit.lead_score)
+        row.lead_priority = audit.lead_priority
+        row.target_reason = audit.target_reason
+        audited.append(row)
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     csv_path = output_dir / "tradies-brisbane-cbd-nearby-suburbs.csv"
     xlsx_path = output_dir / "tradies-brisbane-cbd-nearby-suburbs.xlsx"
-    write_csv(csv_path, deduped)
-    write_xlsx(xlsx_path, deduped)
+    write_csv(csv_path, audited)
+    write_xlsx(xlsx_path, audited)
     print(f"Raw rows: {len(all_rows)}")
     print(f"Deduped rows: {len(deduped)}")
+    print(f"Audited rows: {len(audited)}")
     print(f"CSV: {csv_path}")
     print(f"XLSX: {xlsx_path}")
     return 0

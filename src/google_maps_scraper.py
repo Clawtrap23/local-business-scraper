@@ -42,6 +42,16 @@ class Business:
     services: str = ""
     hours: str = ""
     maps_url: str = ""
+    website_status: str = ""
+    website_quality: str = ""
+    website_quality_score: str = ""
+    website_notes: str = ""
+    has_contact_form: str = ""
+    has_quote_intent: str = ""
+    has_recent_year_signal: str = ""
+    lead_score: str = ""
+    lead_priority: str = ""
+    target_reason: str = ""
 
 
 def clean_text(value: str) -> str:

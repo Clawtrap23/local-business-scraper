@@ -261,6 +261,67 @@ Depending on the Google Maps listing, output rows may include:
 - opening hours
 - Google Maps listing URL
 
+The tradies pipeline now also adds a **website audit and lead scoring layer**:
+- `website_status`
+- `website_quality`
+- `website_quality_score`
+- `website_notes`
+- `has_contact_form`
+- `has_quote_intent`
+- `has_recent_year_signal`
+- `lead_score`
+- `lead_priority`
+- `target_reason`
+
+## Lead scoring and website audit logic
+
+The project now tries to classify each business into one of these website states:
+- `no_website`
+- `website_unreachable`
+- `has_website`
+
+Then it scores website quality with a simple practical heuristic:
+- `none` = no website listed
+- `weak` = website missing / unreachable / very weak signals
+- `basic` = some modern signals but limited conversion features
+- `modern` = stronger modern signals
+
+### Signals checked
+
+The current audit checks things like:
+- does the business have a listed website
+- can the website actually load
+- does the website use HTTPS
+- is there a visible contact form
+- is there visible quote / booking intent
+- is there a recent year signal in the site content
+
+### Lead scoring logic
+
+This score is intentionally simple and sales-oriented.
+
+Businesses score higher when they are:
+- high-value tradie categories
+- missing a website
+- have a weak/unreachable website
+- have a phone number listed
+- have signs of real business activity
+- have no visible quote funnel or contact form
+
+### Practical interpretation
+
+- `high` priority:
+  - strongest website / CRM opportunity
+  - usually no website or weak website plus strong tradie fit
+
+- `medium` priority:
+  - may have a basic website but still a strong improvement opportunity
+
+- `low` priority:
+  - usually already has a more modern website or weaker commercial fit
+
+This is not a perfect truth engine. It is a **sales targeting heuristic** to help sort the scraped list into more useful buckets.
+
 ## Known limitations
 
 - Google Maps scraping is more useful than the old OSM pipeline, but it is also more brittle.

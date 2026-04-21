@@ -3,7 +3,8 @@ import argparse
 import csv
 import re
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Set
+from urllib.parse import urljoin, urlparse
 
 import requests
 from openpyxl import Workbook
@@ -12,10 +13,14 @@ TIMEOUT = 20
 HEADERS = {"User-Agent": "local-business-scraper/enrichment/1.0"}
 EMAIL_RE = re.compile(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", re.I)
 PHONE_RE = re.compile(r"\+?\d[\d\s().-]{7,}\d")
+HREF_RE = re.compile(r"href=[\"']([^\"'#]+)[\"']", re.I)
+EMAIL_CLEAN_RE = re.compile(r"^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$", re.I)
 
 CONTACT_HINTS = ["contact", "quote", "book", "booking", "enquiry", "inquiry", "service"]
 SOCIAL_HINTS = ["facebook.com", "instagram.com", "linkedin.com", "youtube.com", "tiktok.com"]
 DIRECTORY_HINTS = ["tripadvisor.com", "yelp.com", "yellowpages", "oneflare", "hipages"]
+DEEP_PAGE_HINTS = ["contact", "about", "quote", "book", "booking", "enquiry", "inquiry", "service", "services"]
+MAX_DEEP_PAGES = 5
 
 
 def normalize_url(url: str) -> str:
@@ -41,27 +46,65 @@ def extract_title(html: str) -> str:
     return re.sub(r"\s+", " ", m.group(1)).strip() if m else ""
 
 
-def extract_emails(html: str) -> str:
-    return " ; ".join(sorted(set(EMAIL_RE.findall(html))))
+def extract_emails(html: str) -> Set[str]:
+    found = set()
+    for email in EMAIL_RE.findall(html):
+        email = email.strip()
+        if not EMAIL_CLEAN_RE.match(email):
+            continue
+        if any(email.lower().endswith(ext) for ext in ['.png', '.jpg', '.jpeg', '.svg', '.webp', '.gif']):
+            continue
+        found.add(email)
+    return found
 
 
-def extract_phones(html: str) -> str:
-    found = sorted(set(p.strip() for p in PHONE_RE.findall(html)))
-    return " ; ".join(found[:5])
+def extract_phones(html: str) -> Set[str]:
+    cleaned = set()
+    for raw in PHONE_RE.findall(html):
+        value = raw.strip()
+        digits = re.sub(r'\D', '', value)
+        if len(digits) < 8 or len(digits) > 15:
+            continue
+        cleaned.add(value)
+    return cleaned
 
 
 def detect_contact_hints(html_lower: str) -> str:
     return "yes" if any(hint in html_lower for hint in CONTACT_HINTS) else "no"
 
 
-def detect_socials(html_lower: str) -> str:
-    found = [hint for hint in SOCIAL_HINTS if hint in html_lower]
-    return ", ".join(found) if found else ""
+def detect_socials(html_lower: str) -> Set[str]:
+    return {hint for hint in SOCIAL_HINTS if hint in html_lower}
 
 
-def detect_directories(html_lower: str) -> str:
-    found = [hint for hint in DIRECTORY_HINTS if hint in html_lower]
-    return ", ".join(found) if found else ""
+def detect_directories(html_lower: str) -> Set[str]:
+    return {hint for hint in DIRECTORY_HINTS if hint in html_lower}
+
+
+def extract_internal_links(base_url: str, html: str) -> List[str]:
+    parsed_base = urlparse(base_url)
+    links = []
+    for href in HREF_RE.findall(html):
+        absolute = urljoin(base_url, href)
+        parsed = urlparse(absolute)
+        if parsed.scheme not in {"http", "https"}:
+            continue
+        if parsed.netloc != parsed_base.netloc:
+            continue
+        target = absolute.lower()
+        if any(target.endswith(ext) for ext in ['.css', '.js', '.png', '.jpg', '.jpeg', '.svg', '.webp', '.gif', '.pdf', '.xml']):
+            continue
+        if '/wp-content/' in target or '/wp-json/' in target or '/feed/' in target:
+            continue
+        if any(hint in target for hint in DEEP_PAGE_HINTS):
+            links.append(absolute)
+    deduped = []
+    seen = set()
+    for link in links:
+        if link not in seen:
+            seen.add(link)
+            deduped.append(link)
+    return deduped[:MAX_DEEP_PAGES]
 
 
 def enrich_row(row: Dict[str, str]) -> Dict[str, str]:
@@ -74,6 +117,8 @@ def enrich_row(row: Dict[str, str]) -> Dict[str, str]:
         row["enriched_contact_hints"] = "no"
         row["enriched_social_links"] = ""
         row["enriched_directory_mentions"] = ""
+        row["enriched_deep_pages_checked"] = "0"
+        row["enriched_deep_page_urls"] = ""
         row["enriched_notes"] = "No website to enrich"
         return row
 
@@ -86,18 +131,40 @@ def enrich_row(row: Dict[str, str]) -> Dict[str, str]:
         row["enriched_contact_hints"] = "unknown"
         row["enriched_social_links"] = ""
         row["enriched_directory_mentions"] = ""
+        row["enriched_deep_pages_checked"] = "0"
+        row["enriched_deep_page_urls"] = ""
         row["enriched_notes"] = "Website listed but page could not be loaded"
         return row
 
+    emails = extract_emails(html)
+    phones = extract_phones(html)
     html_lower = html.lower()
+    socials = detect_socials(html_lower)
+    directories = detect_directories(html_lower)
+    deep_links = extract_internal_links(final_url, html)
+
+    for link in deep_links:
+        _, deep_html = fetch(link)
+        if not deep_html:
+            continue
+        deep_lower = deep_html.lower()
+        emails |= extract_emails(deep_html)
+        phones |= extract_phones(deep_html)
+        socials |= detect_socials(deep_lower)
+        directories |= detect_directories(deep_lower)
+        if detect_contact_hints(deep_lower) == "yes":
+            html_lower += " contact"
+
     row["enriched_final_url"] = final_url
     row["enriched_page_title"] = extract_title(html)
-    row["enriched_emails_found"] = extract_emails(html)
-    row["enriched_phones_found"] = extract_phones(html)
+    row["enriched_emails_found"] = " ; ".join(sorted(emails))
+    row["enriched_phones_found"] = " ; ".join(sorted(phones)[:8])
     row["enriched_contact_hints"] = detect_contact_hints(html_lower)
-    row["enriched_social_links"] = detect_socials(html_lower)
-    row["enriched_directory_mentions"] = detect_directories(html_lower)
-    row["enriched_notes"] = "Website enrichment completed"
+    row["enriched_social_links"] = ", ".join(sorted(socials))
+    row["enriched_directory_mentions"] = ", ".join(sorted(directories))
+    row["enriched_deep_pages_checked"] = str(len(deep_links))
+    row["enriched_deep_page_urls"] = " ; ".join(deep_links)
+    row["enriched_notes"] = "Deep website enrichment completed"
     return row
 
 

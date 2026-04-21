@@ -9,6 +9,8 @@ from urllib.parse import unquote, urljoin, urlparse
 import requests
 from openpyxl import Workbook
 
+from src.social_relevance import score_social_relevance
+
 TIMEOUT = 20
 HEADERS = {"User-Agent": "local-business-scraper/enrichment/1.0"}
 EMAIL_RE = re.compile(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", re.I)
@@ -264,6 +266,24 @@ def enrich_row(row: Dict[str, str]) -> Dict[str, str]:
     row["enriched_linkedin_url"] = social_urls.get("linkedin", "")
     row["enriched_youtube_url"] = social_urls.get("youtube", "")
     row["enriched_tiktok_url"] = social_urls.get("tiktok", "")
+
+    best_confidence = "none"
+    best_reason = "No social URL"
+    best_score = 0
+    for key in ["facebook", "instagram", "linkedin", "youtube", "tiktok"]:
+        url = social_urls.get(key, "")
+        result = score_social_relevance(row.get("name", ""), url)
+        row[f"enriched_{key}_relevance_score"] = str(result.score)
+        row[f"enriched_{key}_relevance_confidence"] = result.confidence
+        row[f"enriched_{key}_relevance_reason"] = result.reason
+        if result.score > best_score:
+            best_score = result.score
+            best_confidence = result.confidence
+            best_reason = f"{key}: {result.reason}"
+
+    row["enriched_social_relevance_best_score"] = str(best_score)
+    row["enriched_social_relevance_best_confidence"] = best_confidence
+    row["enriched_social_relevance_best_reason"] = best_reason
     row["enriched_directory_mentions"] = ", ".join(sorted(directories))
     row["enriched_deep_pages_checked"] = str(len(deep_links))
     row["enriched_deep_page_urls"] = " ; ".join(deep_links)

@@ -20,6 +20,13 @@ MAILTO_RE = re.compile(r"mailto:([^\"'>\s?]+)", re.I)
 
 CONTACT_HINTS = ["contact", "quote", "book", "booking", "enquiry", "inquiry", "service"]
 SOCIAL_HINTS = ["facebook.com", "instagram.com", "linkedin.com", "youtube.com", "tiktok.com"]
+SOCIAL_DOMAINS = {
+    "facebook": "facebook.com",
+    "instagram": "instagram.com",
+    "linkedin": "linkedin.com",
+    "youtube": "youtube.com",
+    "tiktok": "tiktok.com",
+}
 DIRECTORY_HINTS = ["tripadvisor.com", "yelp.com", "yellowpages", "oneflare", "hipages"]
 DEEP_PAGE_HINTS = ["contact", "about", "quote", "book", "booking", "enquiry", "inquiry", "service", "services"]
 MAX_DEEP_PAGES = 5
@@ -103,6 +110,33 @@ def detect_directories(html_lower: str) -> Set[str]:
     return {hint for hint in DIRECTORY_HINTS if hint in html_lower}
 
 
+def extract_all_links(base_url: str, html: str) -> List[str]:
+    links = []
+    for href in HREF_RE.findall(html):
+        absolute = urljoin(base_url, href)
+        parsed = urlparse(absolute)
+        if parsed.scheme not in {"http", "https"}:
+            continue
+        links.append(absolute)
+    deduped = []
+    seen = set()
+    for link in links:
+        if link not in seen:
+            seen.add(link)
+            deduped.append(link)
+    return deduped
+
+
+def extract_social_urls(base_url: str, html: str) -> Dict[str, str]:
+    social_urls = {key: "" for key in SOCIAL_DOMAINS}
+    for link in extract_all_links(base_url, html):
+        lowered = link.lower()
+        for key, domain in SOCIAL_DOMAINS.items():
+            if domain in lowered and not social_urls[key]:
+                social_urls[key] = link
+    return social_urls
+
+
 def extract_internal_links(base_url: str, html: str) -> List[str]:
     parsed_base = urlparse(base_url)
     links = []
@@ -129,40 +163,40 @@ def extract_internal_links(base_url: str, html: str) -> List[str]:
     return deduped[:MAX_DEEP_PAGES]
 
 
+def set_empty_enrichment(row: Dict[str, str], notes: str, contact_hints: str) -> Dict[str, str]:
+    row["enriched_final_url"] = ""
+    row["enriched_page_title"] = ""
+    row["enriched_emails_found"] = ""
+    row["enriched_phones_found"] = ""
+    row["enriched_contact_hints"] = contact_hints
+    row["enriched_social_links"] = ""
+    row["enriched_facebook_url"] = ""
+    row["enriched_instagram_url"] = ""
+    row["enriched_linkedin_url"] = ""
+    row["enriched_youtube_url"] = ""
+    row["enriched_tiktok_url"] = ""
+    row["enriched_directory_mentions"] = ""
+    row["enriched_deep_pages_checked"] = "0"
+    row["enriched_deep_page_urls"] = ""
+    row["enriched_notes"] = notes
+    return row
+
+
 def enrich_row(row: Dict[str, str]) -> Dict[str, str]:
     website = normalize_url(row.get("website", ""))
     if not website:
-        row["enriched_final_url"] = ""
-        row["enriched_page_title"] = ""
-        row["enriched_emails_found"] = ""
-        row["enriched_phones_found"] = ""
-        row["enriched_contact_hints"] = "no"
-        row["enriched_social_links"] = ""
-        row["enriched_directory_mentions"] = ""
-        row["enriched_deep_pages_checked"] = "0"
-        row["enriched_deep_page_urls"] = ""
-        row["enriched_notes"] = "No website to enrich"
-        return row
+        return set_empty_enrichment(row, "No website to enrich", "no")
 
     final_url, html = fetch(website)
     if not final_url or not html:
-        row["enriched_final_url"] = ""
-        row["enriched_page_title"] = ""
-        row["enriched_emails_found"] = ""
-        row["enriched_phones_found"] = ""
-        row["enriched_contact_hints"] = "unknown"
-        row["enriched_social_links"] = ""
-        row["enriched_directory_mentions"] = ""
-        row["enriched_deep_pages_checked"] = "0"
-        row["enriched_deep_page_urls"] = ""
-        row["enriched_notes"] = "Website listed but page could not be loaded"
-        return row
+        return set_empty_enrichment(row, "Website listed but page could not be loaded", "unknown")
 
     emails = extract_emails(html)
     phones = extract_phones(html)
     html_lower = html.lower()
     socials = detect_socials(html_lower)
     directories = detect_directories(html_lower)
+    social_urls = extract_social_urls(final_url, html)
     deep_links = extract_internal_links(final_url, html)
 
     for link in deep_links:
@@ -174,6 +208,10 @@ def enrich_row(row: Dict[str, str]) -> Dict[str, str]:
         phones |= extract_phones(deep_html)
         socials |= detect_socials(deep_lower)
         directories |= detect_directories(deep_lower)
+        deep_socials = extract_social_urls(link, deep_html)
+        for key, value in deep_socials.items():
+            if value and not social_urls.get(key):
+                social_urls[key] = value
         if detect_contact_hints(deep_lower) == "yes":
             html_lower += " contact"
 
@@ -183,6 +221,11 @@ def enrich_row(row: Dict[str, str]) -> Dict[str, str]:
     row["enriched_phones_found"] = " ; ".join(sorted(phones)[:8])
     row["enriched_contact_hints"] = detect_contact_hints(html_lower)
     row["enriched_social_links"] = ", ".join(sorted(socials))
+    row["enriched_facebook_url"] = social_urls.get("facebook", "")
+    row["enriched_instagram_url"] = social_urls.get("instagram", "")
+    row["enriched_linkedin_url"] = social_urls.get("linkedin", "")
+    row["enriched_youtube_url"] = social_urls.get("youtube", "")
+    row["enriched_tiktok_url"] = social_urls.get("tiktok", "")
     row["enriched_directory_mentions"] = ", ".join(sorted(directories))
     row["enriched_deep_pages_checked"] = str(len(deep_links))
     row["enriched_deep_page_urls"] = " ; ".join(deep_links)

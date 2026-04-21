@@ -368,6 +368,11 @@ Current enrichment fields include:
 - `enriched_phones_found`
 - `enriched_contact_hints`
 - `enriched_social_links`
+- `enriched_facebook_url`
+- `enriched_instagram_url`
+- `enriched_linkedin_url`
+- `enriched_youtube_url`
+- `enriched_tiktok_url`
 - `enriched_directory_mentions`
 - `enriched_deep_pages_checked`
 - `enriched_deep_page_urls`

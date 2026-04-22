@@ -201,12 +201,22 @@ Examples:
 - `crm_lead_score`
 - `crm_lead_priority`
 - `crm_lead_reason`
+- `crm_maturity_score`
+- `crm_maturity_level`
+- `crm_detected_tools`
+- `crm_detected_forms`
+- `crm_detected_booking_signals`
+- `crm_detected_chat_widgets`
+- `crm_detected_portal_signals`
+- `crm_operational_complexity`
 - `best_offer_type`
 - `outreach_angle`
 
 ### Interpretation
 - `website_lead_*` fields tell you how strong the business is as a website/redesign lead
 - `crm_lead_*` fields tell you how strong the business is as a CRM/process/lead-handling lead
+- `crm_maturity_*` fields estimate how developed their current workflow stack already is
+- `crm_detected_*` fields show what the scanner found on the website
 - `best_offer_type` suggests whether you should lead with:
   - `website`
   - `crm`
@@ -596,6 +606,12 @@ Best signs:
 - weak follow-up / process clues
 
 The project now scores both of those lead types separately.
+
+On the CRM side, the system now also scans the website for:
+- embedded CRM / marketing / booking tools
+- visible forms and booking signals
+- chat widgets and portal hints
+- operational complexity clues like emergency-service language, service-area language, and team/service breadth
 
 ---
 

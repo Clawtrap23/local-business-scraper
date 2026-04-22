@@ -102,6 +102,14 @@ def main() -> int:
         row.crm_lead_score = str(audit.crm_lead_score)
         row.crm_lead_priority = audit.crm_lead_priority
         row.crm_lead_reason = audit.crm_lead_reason
+        row.crm_maturity_score = str(audit.crm_maturity_score)
+        row.crm_maturity_level = audit.crm_maturity_level
+        row.crm_detected_tools = audit.crm_detected_tools
+        row.crm_detected_forms = audit.crm_detected_forms
+        row.crm_detected_booking_signals = audit.crm_detected_booking_signals
+        row.crm_detected_chat_widgets = audit.crm_detected_chat_widgets
+        row.crm_detected_portal_signals = audit.crm_detected_portal_signals
+        row.crm_operational_complexity = audit.crm_operational_complexity
         row.best_offer_type = audit.best_offer_type
         row.outreach_angle = audit.outreach_angle
         audited.append(row)

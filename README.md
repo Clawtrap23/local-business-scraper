@@ -459,6 +459,359 @@ A row can now include:
 - social relevance scores
 - deep pages crawled
 
+## Full field reference
+
+Below is what each output field means.
+
+### Discovery fields
+
+#### `query`
+The exact Google Maps search query used to find the business.
+Example: `plumbers in Brisbane City Brisbane`
+
+#### `name`
+The business name extracted from Google Maps.
+
+#### `category`
+The business category shown in Google Maps.
+Examples: `Plumber`, `Locksmith`, `Electrician`
+
+#### `address`
+The street address or location text extracted from Google Maps.
+
+#### `website`
+The website URL shown in Google Maps.
+This is the starting website URL before deeper enrichment.
+
+#### `phone`
+The phone number shown in Google Maps.
+This is separate from enriched website-extracted phones.
+
+#### `rating`
+The Google Maps rating text.
+Usually something like `4.8`.
+
+#### `reviews_count`
+The reviews count text from Google Maps.
+May be blank if extraction failed or Google did not show it clearly.
+
+#### `services`
+Extra services-related text extracted from the listing when available.
+This can help show breadth of offering.
+
+#### `hours`
+Business hours text extracted from Google Maps when available.
+
+#### `maps_url`
+The direct Google Maps place URL for that business listing.
+Useful for manual review.
+
+### Website audit fields
+
+#### `website_status`
+The high-level website status.
+Typical values:
+- `no_website`
+- `website_unreachable`
+- `has_website`
+
+#### `website_quality`
+A simple website quality classification.
+Typical values:
+- `none`
+- `weak`
+- `basic`
+- `modern`
+
+#### `website_quality_score`
+Numeric score behind the website quality classification.
+Higher usually means a stronger/more complete website presence.
+
+#### `website_notes`
+Short explanation of what the audit found.
+Examples:
+- uses HTTPS
+- has contact form
+- has quote intent
+- recent year signal found
+
+#### `has_contact_form`
+Whether the website appears to have a visible contact form.
+Typical values:
+- `yes`
+- `no`
+- `unknown`
+
+#### `has_quote_intent`
+Whether the website shows visible quote/booking intent.
+Typical values:
+- `yes`
+- `no`
+- `unknown`
+
+This is based on phrases like:
+- request a quote
+- get a quote
+- book now
+- free quote
+
+#### `has_recent_year_signal`
+Whether the website appears to contain a recent year signal.
+This is used as a rough proxy that the site may be more recently maintained.
+
+### Combined lead scoring fields
+
+#### `lead_score`
+The overall combined commercial score.
+Currently this is driven by the stronger of the website or CRM opportunity score.
+
+#### `lead_priority`
+Priority bucket for the overall combined lead.
+Typical values:
+- `high`
+- `medium`
+- `low`
+
+#### `target_reason`
+Combined human-readable reason explaining why the row looks commercially interesting.
+
+### Website lead fields
+
+#### `website_lead_score`
+Numeric score for website/redesign opportunity.
+Higher means the business looks more like a website sales target.
+
+#### `website_lead_priority`
+Priority bucket for website opportunity.
+Typical values:
+- `high`
+- `medium`
+- `low`
+
+#### `website_lead_reason`
+Human-readable explanation for the website score.
+Examples:
+- no website
+- weak website
+- no contact form
+- no quote funnel
+
+### CRM lead fields
+
+#### `crm_lead_score`
+Numeric score for CRM / lead-handling / process opportunity.
+Higher means the business looks like a stronger CRM/process target.
+
+#### `crm_lead_priority`
+Priority bucket for CRM opportunity.
+Typical values:
+- `high`
+- `medium`
+- `low`
+
+#### `crm_lead_reason`
+Human-readable explanation for the CRM opportunity score.
+
+#### `crm_maturity_score`
+Estimated score for how mature the current visible CRM/workflow stack appears to be.
+Higher means more visible tooling or workflow structure is present.
+
+#### `crm_maturity_level`
+Bucketed maturity estimate.
+Typical values:
+- `low`
+- `medium`
+- `high`
+
+#### `crm_detected_tools`
+Comma-separated list of CRM, marketing, form, booking, or chat tools detected on the site.
+Examples:
+- `salesforce`
+- `servicem8`
+- `hubspot`
+- `intercom`
+
+#### `crm_detected_forms`
+Comma-separated list of form/workflow types detected.
+Examples:
+- `contact_form`
+- `quote_form`
+- `booking_form`
+- `callback_request`
+
+#### `crm_detected_booking_signals`
+Booking-related wording or signals found on the website.
+Examples:
+- `book now`
+- `online booking`
+- `appointment`
+
+#### `crm_detected_chat_widgets`
+Chat-related tools or chat signals found on the site.
+Examples:
+- `intercom`
+- `tawk.to`
+- `live chat`
+
+#### `crm_detected_portal_signals`
+Portal/login-related signals found on the site.
+Examples:
+- `client portal`
+- `customer portal`
+- `account login`
+
+#### `crm_operational_complexity`
+Rough estimate of business complexity based on website clues.
+Typical values:
+- `low`
+- `medium`
+- `high`
+
+This uses clues like:
+- emergency service messaging
+- many services
+- service-area wording
+- team/staff wording
+
+### Offer recommendation fields
+
+#### `best_offer_type`
+Suggested first commercial angle.
+Typical values:
+- `website`
+- `crm`
+- `website_and_crm`
+
+#### `outreach_angle`
+A plain-English suggestion for how to pitch the business first.
+
+### Enrichment fields
+These fields are added when you run `enrich` mode on an existing CSV.
+
+#### `enriched_final_url`
+The final website URL after redirects when enrichment visits the site.
+
+#### `enriched_page_title`
+The homepage title detected during enrichment.
+
+#### `enriched_emails_found`
+Emails extracted from the homepage and key internal pages.
+Usually includes cleaned `mailto:` results when found.
+
+#### `enriched_phones_found`
+Phone numbers extracted from the website and normalized into cleaner formats.
+This is website-derived data, not the raw Google Maps phone field.
+
+#### `enriched_best_phone`
+The single best phone number chosen from the enriched website phone set.
+Useful for outreach targeting.
+
+#### `enriched_contact_hints`
+Whether the site appears to contain contact-related wording.
+Typical values:
+- `yes`
+- `no`
+- `unknown`
+
+#### `enriched_contact_page_urls`
+List of likely contact/quote/booking page URLs found on the website.
+
+#### `enriched_contact_page_best_url`
+The single best contact-style page URL chosen from the discovered contact pages.
+
+#### `enriched_social_links`
+High-level social presence summary based on detected domains.
+Examples may include:
+- `facebook.com`
+- `instagram.com`
+- `linkedin.com`
+
+#### `enriched_facebook_url`
+The exact Facebook URL extracted from the site, if found.
+
+#### `enriched_instagram_url`
+The exact Instagram URL extracted from the site, if found.
+
+#### `enriched_linkedin_url`
+The exact LinkedIn URL extracted from the site, if found.
+
+#### `enriched_youtube_url`
+The exact YouTube URL extracted from the site, if found.
+
+#### `enriched_tiktok_url`
+The exact TikTok URL extracted from the site, if found.
+
+#### `enriched_facebook_relevance_score`
+Numeric estimate of how relevant the detected Facebook URL looks to the business name.
+
+#### `enriched_facebook_relevance_confidence`
+Confidence label for the Facebook relevance estimate.
+
+#### `enriched_facebook_relevance_reason`
+Short explanation for the Facebook relevance estimate.
+
+#### `enriched_instagram_relevance_score`
+Numeric estimate of how relevant the detected Instagram URL looks to the business name.
+
+#### `enriched_instagram_relevance_confidence`
+Confidence label for the Instagram relevance estimate.
+
+#### `enriched_instagram_relevance_reason`
+Short explanation for the Instagram relevance estimate.
+
+#### `enriched_linkedin_relevance_score`
+Numeric estimate of how relevant the detected LinkedIn URL looks to the business name.
+
+#### `enriched_linkedin_relevance_confidence`
+Confidence label for the LinkedIn relevance estimate.
+
+#### `enriched_linkedin_relevance_reason`
+Short explanation for the LinkedIn relevance estimate.
+
+#### `enriched_youtube_relevance_score`
+Numeric estimate of how relevant the detected YouTube URL looks to the business name.
+
+#### `enriched_youtube_relevance_confidence`
+Confidence label for the YouTube relevance estimate.
+
+#### `enriched_youtube_relevance_reason`
+Short explanation for the YouTube relevance estimate.
+
+#### `enriched_tiktok_relevance_score`
+Numeric estimate of how relevant the detected TikTok URL looks to the business name.
+
+#### `enriched_tiktok_relevance_confidence`
+Confidence label for the TikTok relevance estimate.
+
+#### `enriched_tiktok_relevance_reason`
+Short explanation for the TikTok relevance estimate.
+
+#### `enriched_social_relevance_best_score`
+Best relevance score across all detected social platforms.
+
+#### `enriched_social_relevance_best_confidence`
+Confidence label for the best social relevance result found.
+
+#### `enriched_social_relevance_best_reason`
+Short explanation for the strongest social relevance result.
+
+#### `enriched_directory_mentions`
+Directory domains mentioned on the website when detected.
+Examples:
+- Yellow Pages
+- Yelp-style references
+- Oneflare
+- hipages
+
+#### `enriched_deep_pages_checked`
+Number of internal pages checked during enrichment crawling.
+
+#### `enriched_deep_page_urls`
+List of internal pages visited during deep enrichment.
+
+#### `enriched_notes`
+Short summary note about the enrichment run.
+
 ---
 
 # 7. Setup

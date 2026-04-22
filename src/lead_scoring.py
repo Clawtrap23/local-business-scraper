@@ -72,6 +72,7 @@ COMPLEXITY_PATTERNS = {
 
 DEEP_PAGE_HINTS = ["contact", "about", "quote", "book", "booking", "service", "services", "emergency"]
 MAX_DEEP_PAGES = 4
+STRONG_HOMEPAGE_SIGNAL_SCORE = 5
 
 
 @dataclass
@@ -153,41 +154,68 @@ def extract_internal_links(base_url: str, html: str) -> List[str]:
     return deduped[:MAX_DEEP_PAGES]
 
 
-def scan_crm_signals(final_url: str, html: str) -> dict:
-    pages = [(final_url, html)]
-    for link in extract_internal_links(final_url, html):
-        fetched_url, fetched_html = fetch_website(link)
-        if fetched_url and fetched_html:
-            pages.append((fetched_url, fetched_html))
-
-    combined = "\n".join(page_html.lower() for _, page_html in pages)
-
+def detect_signal_set(html_lower: str) -> dict:
     detected_tools = []
     for tool, patterns in CRM_TOOL_PATTERNS.items():
-        if any(pattern in combined for pattern in patterns):
+        if any(pattern in html_lower for pattern in patterns):
             detected_tools.append(tool)
 
     detected_forms = []
     for form_name, patterns in FORM_PATTERNS.items():
-        if any(pattern in combined for pattern in patterns):
+        if any(pattern in html_lower for pattern in patterns):
             detected_forms.append(form_name)
 
-    booking_signals = [pattern for pattern in BOOKING_PATTERNS if pattern in combined]
-    chat_widgets = [pattern for pattern in CHAT_PATTERNS if pattern in combined]
-    portal_signals = [pattern for pattern in PORTAL_PATTERNS if pattern in combined]
-    complexity_signals = [name for name, patterns in COMPLEXITY_PATTERNS.items() if any(pattern in combined for pattern in patterns)]
+    booking_signals = sorted({pattern for pattern in BOOKING_PATTERNS if pattern in html_lower})
+    chat_widgets = sorted({pattern for pattern in CHAT_PATTERNS if pattern in html_lower})
+    portal_signals = sorted({pattern for pattern in PORTAL_PATTERNS if pattern in html_lower})
+    complexity_signals = sorted({name for name, patterns in COMPLEXITY_PATTERNS.items() if any(pattern in html_lower for pattern in patterns)})
 
+    return {
+        "detected_tools": detected_tools,
+        "detected_forms": detected_forms,
+        "booking_signals": booking_signals,
+        "chat_widgets": chat_widgets,
+        "portal_signals": portal_signals,
+        "complexity_signals": complexity_signals,
+    }
+
+
+def signal_maturity_score(signal_set: dict) -> int:
     maturity_score = 0
-    if detected_tools:
-        maturity_score += min(4, len(detected_tools))
-    if detected_forms:
-        maturity_score += min(3, len(detected_forms))
-    if booking_signals:
+    if signal_set["detected_tools"]:
+        maturity_score += min(4, len(signal_set["detected_tools"]))
+    if signal_set["detected_forms"]:
+        maturity_score += min(3, len(signal_set["detected_forms"]))
+    if signal_set["booking_signals"]:
         maturity_score += 2
-    if chat_widgets:
+    if signal_set["chat_widgets"]:
         maturity_score += 1
-    if portal_signals:
+    if signal_set["portal_signals"]:
         maturity_score += 2
+    return maturity_score
+
+
+def merge_signal_sets(base: dict, extra: dict) -> dict:
+    merged = {}
+    for key in ["detected_tools", "detected_forms", "booking_signals", "chat_widgets", "portal_signals", "complexity_signals"]:
+        merged[key] = sorted(set(base.get(key, [])) | set(extra.get(key, [])))
+    return merged
+
+
+def scan_crm_signals(final_url: str, html: str) -> dict:
+    homepage_signals = detect_signal_set(html.lower())
+    combined_signals = homepage_signals
+
+    if signal_maturity_score(homepage_signals) < STRONG_HOMEPAGE_SIGNAL_SCORE:
+        for link in extract_internal_links(final_url, html):
+            fetched_url, fetched_html = fetch_website(link)
+            if fetched_url and fetched_html:
+                deep_signals = detect_signal_set(fetched_html.lower())
+                combined_signals = merge_signal_sets(combined_signals, deep_signals)
+                if signal_maturity_score(combined_signals) >= STRONG_HOMEPAGE_SIGNAL_SCORE:
+                    break
+
+    maturity_score = signal_maturity_score(combined_signals)
 
     if maturity_score >= 7:
         maturity_level = "high"
@@ -196,9 +224,10 @@ def scan_crm_signals(final_url: str, html: str) -> dict:
     else:
         maturity_level = "low"
 
-    if len(complexity_signals) >= 3:
+    complexity_count = len(combined_signals["complexity_signals"])
+    if complexity_count >= 3:
         operational_complexity = "high"
-    elif len(complexity_signals) >= 1:
+    elif complexity_count >= 1:
         operational_complexity = "medium"
     else:
         operational_complexity = "low"
@@ -206,11 +235,11 @@ def scan_crm_signals(final_url: str, html: str) -> dict:
     return {
         "crm_maturity_score": maturity_score,
         "crm_maturity_level": maturity_level,
-        "crm_detected_tools": ", ".join(detected_tools),
-        "crm_detected_forms": ", ".join(detected_forms),
-        "crm_detected_booking_signals": ", ".join(sorted(set(booking_signals))),
-        "crm_detected_chat_widgets": ", ".join(sorted(set(chat_widgets))),
-        "crm_detected_portal_signals": ", ".join(sorted(set(portal_signals))),
+        "crm_detected_tools": ", ".join(combined_signals["detected_tools"]),
+        "crm_detected_forms": ", ".join(combined_signals["detected_forms"]),
+        "crm_detected_booking_signals": ", ".join(combined_signals["booking_signals"]),
+        "crm_detected_chat_widgets": ", ".join(combined_signals["chat_widgets"]),
+        "crm_detected_portal_signals": ", ".join(combined_signals["portal_signals"]),
         "crm_operational_complexity": operational_complexity,
     }
 

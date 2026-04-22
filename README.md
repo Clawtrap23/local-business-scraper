@@ -859,15 +859,68 @@ python run.py tradies --total-per-query 8
 
 Note:
 - Google Maps collection is now hard capped at **20 results per query** even if a higher number is requested.
-- The tradies pipeline now saves checkpoint output after each query.
+- The tradies pipeline now saves a checkpoint CSV after each query.
+- XLSX checkpoints are written less often and always written at the end.
+- The pipeline now stores run state and an audit cache so interrupted jobs can resume more efficiently.
+
+### How the tradies pipeline works now
+
+The current `tradies` mode behaves like this:
+
+1. Read all suburbs from `config/brisbane-cbd-nearby-suburbs.txt`.
+2. Read all tradie categories from `config/tradie-keywords.txt`.
+3. Build one Google Maps query per suburb/category combination.
+4. Skip queries already marked completed in the saved run-state file.
+5. Scrape up to 20 Google Maps results for the current query.
+6. Add raw rows into the in-progress dataset.
+7. Deduplicate businesses across all collected rows.
+8. Audit only businesses that are not already present in the audit cache.
+9. Reuse cached website/CRM audit results for previously seen businesses.
+10. Write the current checkpoint CSV after each query.
+11. Write the XLSX checkpoint every few queries and again at final completion.
+12. Save run state and audit cache so the job can resume later if interrupted.
+
+### Files the tradies pipeline now creates
+
+Main outputs:
+- `output/tradies-brisbane-cbd-nearby-suburbs.csv`
+- `output/tradies-brisbane-cbd-nearby-suburbs.xlsx`
+
+Resume and cache files:
+- `output/tradies-brisbane-cbd-nearby-suburbs-state.json`
+- `output/tradies-brisbane-cbd-nearby-suburbs-audit-cache.json`
+
+### Resume behavior
+
+If a run is interrupted:
+- completed queries are remembered in the state file
+- raw collected rows are preserved in the state file
+- website/CRM audits are preserved in the audit cache
+
+So the next run can skip already-completed queries and avoid re-auditing the same businesses.
+
+If you want to ignore saved state and start over from scratch, run the tradies pipeline with:
+
+```bash
+python run.py tradies --fresh
+```
+
+### CRM scoring optimization behavior
+
+CRM detection still checks the homepage first and can inspect a few relevant internal pages such as contact, quote, booking, about, or service pages.
+
+However, it now tries to stop early when the homepage already shows strong workflow/tool signals. That reduces unnecessary extra page fetches during scoring.
 
 ### What it does
 - reads suburb file
 - reads tradie keyword file
 - runs Google Maps queries
 - deduplicates results
-- applies website audit and lead scoring
-- writes checkpoint CSV/XLSX after each query so progress is not lost
+- audits only businesses that have not already been audited in the current run cache
+- applies website and CRM scoring
+- writes checkpoint CSV after each query so progress is not lost
+- writes XLSX less frequently to reduce checkpoint overhead
+- stores resume state so interrupted runs can continue without redoing finished queries
 
 ---
 

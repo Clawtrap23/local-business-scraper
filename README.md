@@ -195,14 +195,25 @@ Examples:
 - `lead_score`
 - `lead_priority`
 - `target_reason`
+- `website_lead_score`
+- `website_lead_priority`
+- `website_lead_reason`
+- `crm_lead_score`
+- `crm_lead_priority`
+- `crm_lead_reason`
+- `best_offer_type`
+- `outreach_angle`
 
 ### Interpretation
-- `high`: strongest website / CRM opportunity
-- `medium`: good opportunity, but less urgent or less clear
-- `low`: already has a more modern site or weaker fit
+- `website_lead_*` fields tell you how strong the business is as a website/redesign lead
+- `crm_lead_*` fields tell you how strong the business is as a CRM/process/lead-handling lead
+- `best_offer_type` suggests whether you should lead with:
+  - `website`
+  - `crm`
+  - `website_and_crm`
 
 ### Why this layer exists
-This is what starts turning the sheet from raw data into a useful prospecting list.
+This turns the sheet from raw data into a more commercially useful prospecting list.
 
 ---
 
@@ -584,7 +595,7 @@ Best signs:
 - weak quote/booking flow
 - weak follow-up / process clues
 
-The project is moving toward supporting both of those lead types.
+The project now scores both of those lead types separately.
 
 ---
 

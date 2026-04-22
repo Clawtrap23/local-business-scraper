@@ -52,6 +52,14 @@ class Business:
     lead_score: str = ""
     lead_priority: str = ""
     target_reason: str = ""
+    website_lead_score: str = ""
+    website_lead_priority: str = ""
+    website_lead_reason: str = ""
+    crm_lead_score: str = ""
+    crm_lead_priority: str = ""
+    crm_lead_reason: str = ""
+    best_offer_type: str = ""
+    outreach_angle: str = ""
 
 
 def clean_text(value: str) -> str:

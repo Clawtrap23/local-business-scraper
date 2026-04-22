@@ -38,6 +38,14 @@ class LeadAudit:
     lead_score: int = 0
     lead_priority: str = "unknown"
     target_reason: str = ""
+    website_lead_score: int = 0
+    website_lead_priority: str = "unknown"
+    website_lead_reason: str = ""
+    crm_lead_score: int = 0
+    crm_lead_priority: str = "unknown"
+    crm_lead_reason: str = ""
+    best_offer_type: str = "unknown"
+    outreach_angle: str = ""
 
 
 def normalize_website(url: str) -> str:
@@ -132,57 +140,109 @@ def classify_website(business: Business) -> LeadAudit:
     return score_lead(business, audit)
 
 
+def priority_from_score(score: int) -> str:
+    if score >= 7:
+        return "high"
+    if score >= 4:
+        return "medium"
+    return "low"
+
+
 def score_lead(business: Business, audit: LeadAudit) -> LeadAudit:
-    score = 0
-    reasons = []
-
     category = clean_text(business.category).lower()
-    if category in HIGH_VALUE_CATEGORIES or any(k in category for k in ["plumb", "electric", "locksmith", "roof", "waterproof", "solar", "security", "carpenter"]):
-        score += 2
-        reasons.append("High-value tradie category")
-
-    if audit.website_status == "no_website":
-        score += 5
-        reasons.append("No website")
-    elif audit.website_quality == "weak":
-        score += 4
-        reasons.append("Weak or unreachable website")
-    elif audit.website_quality == "basic":
-        score += 2
-        reasons.append("Basic website")
-    elif audit.website_quality == "modern":
-        score -= 2
-        reasons.append("Modern website lowers website-redesign urgency")
-
-    if business.phone:
-        score += 1
-        reasons.append("Phone listed")
-
     rating_text = clean_text(business.rating)
     try:
         rating_value = float(re.findall(r"\d+(?:\.\d+)?", rating_text)[0]) if rating_text else 0.0
     except Exception:
         rating_value = 0.0
+
+    is_high_value_tradie = category in HIGH_VALUE_CATEGORIES or any(k in category for k in ["plumb", "electric", "locksmith", "roof", "waterproof", "solar", "security", "carpenter"])
+
+    website_score = 0
+    website_reasons = []
+    crm_score = 0
+    crm_reasons = []
+
+    if is_high_value_tradie:
+        website_score += 2
+        crm_score += 2
+        website_reasons.append("High-value tradie category")
+        crm_reasons.append("High-value tradie category")
+
+    if audit.website_status == "no_website":
+        website_score += 5
+        website_reasons.append("No website")
+        crm_score += 2
+        crm_reasons.append("No website suggests weak lead handling stack")
+    elif audit.website_quality == "weak":
+        website_score += 4
+        website_reasons.append("Weak or unreachable website")
+        crm_score += 2
+        crm_reasons.append("Weak website often means weak process layer")
+    elif audit.website_quality == "basic":
+        website_score += 2
+        website_reasons.append("Basic website")
+        crm_score += 3
+        crm_reasons.append("Basic website may hide weak lead handling")
+    elif audit.website_quality == "modern":
+        website_score -= 2
+        website_reasons.append("Modern website lowers redesign urgency")
+        crm_score += 2
+        crm_reasons.append("Modern website may still need better CRM process")
+
+    if business.phone:
+        website_score += 1
+        crm_score += 1
+        website_reasons.append("Phone listed")
+        crm_reasons.append("Phone listed")
+
     if rating_value >= 4.5:
-        score += 1
-        reasons.append("Strong reviews imply active business")
+        website_score += 1
+        crm_score += 2
+        website_reasons.append("Strong reviews imply active business")
+        crm_reasons.append("Strong reviews imply active lead flow")
 
     if audit.has_quote_intent == "no" and audit.website_status == "has_website":
-        score += 1
-        reasons.append("No visible quote funnel")
+        website_score += 1
+        crm_score += 3
+        website_reasons.append("No visible quote funnel")
+        crm_reasons.append("No visible quote funnel")
 
     if audit.has_contact_form == "no" and audit.website_status == "has_website":
-        score += 1
-        reasons.append("No visible contact form")
+        website_score += 1
+        crm_score += 2
+        website_reasons.append("No visible contact form")
+        crm_reasons.append("No visible contact capture")
 
-    if score >= 7:
-        priority = "high"
-    elif score >= 4:
-        priority = "medium"
+    website_priority = priority_from_score(website_score)
+    crm_priority = priority_from_score(crm_score)
+
+    if website_priority == "high" and crm_priority == "high":
+        best_offer_type = "website_and_crm"
+        outreach_angle = "Lead with website improvement and follow with CRM/process automation."
+    elif website_score > crm_score:
+        best_offer_type = "website"
+        outreach_angle = "Lead with website upgrade, conversion, and trust improvements."
+    elif crm_score > website_score:
+        best_offer_type = "crm"
+        outreach_angle = "Lead with lead capture, quoting, follow-up, and CRM automation."
     else:
-        priority = "low"
+        best_offer_type = "website_and_crm"
+        outreach_angle = "Present both website and CRM as a combined growth system."
 
-    audit.lead_score = score
-    audit.lead_priority = priority
-    audit.target_reason = "; ".join(reasons)
+    combined_score = max(website_score, crm_score)
+    combined_priority = priority_from_score(combined_score)
+    combined_reasons = sorted(set(website_reasons + crm_reasons))
+
+    audit.lead_score = combined_score
+    audit.lead_priority = combined_priority
+    audit.target_reason = "; ".join(combined_reasons)
+    audit.website_lead_score = website_score
+    audit.website_lead_priority = website_priority
+    audit.website_lead_reason = "; ".join(website_reasons)
+    audit.crm_lead_score = crm_score
+    audit.crm_lead_priority = crm_priority
+    audit.crm_lead_reason = "; ".join(crm_reasons)
+    audit.best_offer_type = best_offer_type
+    audit.outreach_angle = outreach_angle
     return audit

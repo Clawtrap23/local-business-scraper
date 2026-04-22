@@ -96,6 +96,14 @@ def main() -> int:
         row.lead_score = str(audit.lead_score)
         row.lead_priority = audit.lead_priority
         row.target_reason = audit.target_reason
+        row.website_lead_score = str(audit.website_lead_score)
+        row.website_lead_priority = audit.website_lead_priority
+        row.website_lead_reason = audit.website_lead_reason
+        row.crm_lead_score = str(audit.crm_lead_score)
+        row.crm_lead_priority = audit.crm_lead_priority
+        row.crm_lead_reason = audit.crm_lead_reason
+        row.best_offer_type = audit.best_offer_type
+        row.outreach_angle = audit.outreach_angle
         audited.append(row)
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)

@@ -1,267 +1,165 @@
 # local-business-scraper
 
-A Google Maps based local business and tradies scraping pipeline for Brisbane-style suburb-by-suburb lead collection.
+A layered local-business and tradies lead-generation pipeline built around Google Maps discovery, website enrichment, and sales-oriented scoring.
 
-## What this project is for
+This project is designed to help answer questions like:
+- Which tradies operate around Brisbane CBD and nearby suburbs?
+- Which of them have no website, a weak website, or a modern website?
+- Which businesses are the best targets for a website offer?
+- Which businesses may already have a decent site, but still be good CRM/process leads?
+- Which businesses have usable contact details and social presence for outreach?
 
-This project is designed to collect business information for:
-- plumbers
-- locksmiths
-- carpenters
-- roofers
-- solar installers
-- waterproofing businesses
-- electricians
-- smart home installers
-- security installers
-- and other local service businesses / tradies
+---
 
-The main use case is:
-- pick a target area such as **Brisbane CBD**
-- search nearby suburbs one by one
-- run multiple tradie/business queries
-- collect business listings from **Google Maps**
-- remove duplicates
-- export the final result to **CSV** and **Excel**
+# 1. What this project does overall
 
-## Important status
+At a high level, the pipeline works in layers:
 
-### Main pipeline: Google Maps
-This is the **current recommended pipeline**.
+1. **Discovery layer**
+   - Find businesses using Google Maps searches.
 
-Use this for real work.
+2. **Geographic expansion layer**
+   - Search suburb by suburb, not just one broad city query.
 
-### Old pipeline: OpenStreetMap / Overpass
-This is still present in the repo, but it is now **legacy / mostly obsolete for the intended use case**.
+3. **Deduplication layer**
+   - Merge repeated businesses found through multiple searches.
 
-Why it is no longer the preferred option:
-- weaker coverage for tradies and service businesses
-- misses many websites and real businesses
-- better for generic map POIs than for lead generation
+4. **Website audit layer**
+   - Decide whether the business has no website, a weak/basic website, or a more modern one.
 
-You can still run it, but for tradies and small-business prospecting, use the **Google Maps pipeline** instead.
+5. **Lead scoring layer**
+   - Score how commercially interesting the business looks for a website/CRM offer.
 
-## Project structure
+6. **Website enrichment layer**
+   - Visit the website, crawl important internal pages, and extract contact/social signals.
 
-### Main files
+7. **Social relevance layer**
+   - Estimate whether extracted social links are actually relevant to the business.
 
-- `run.py`
-  - main entry point
-  - lets you run the project in different modes
+The project is therefore not just a scraper. It is becoming a **lead qualification pipeline**.
 
-- `src/google_maps_scraper.py`
-  - single-query Google Maps scraper
-  - useful for tests and one-off searches like:
-    - `plumbers in Brisbane CBD`
+---
 
-- `src/tradie_pipeline.py`
-  - the main multi-suburb pipeline
-  - reads a suburb list and a keyword list
-  - runs many Google Maps searches
-  - deduplicates results
-  - exports final spreadsheet files
+# 2. Important status of the project
 
-- `src/business_scraper.py`
-  - old OpenStreetMap-based pipeline
-  - kept for reference / fallback
-  - no longer the preferred workflow
+## Main pipeline: Google Maps based
+This is the **current recommended pipeline** and the one you should focus on.
 
-### Config files
+Why:
+- much better for tradies and service businesses than the old OSM approach
+- more commercially useful business discovery
+- better contact detail availability
+- much better fit for website + CRM targeting
 
-- `config/brisbane-cbd-nearby-suburbs.txt`
-  - editable list of suburbs to search
-  - one suburb per line
-  - this is where you change the target suburb coverage in future
+## Legacy pipeline: OpenStreetMap / Overpass
+The old OSM-based pipeline is still in the repo, but it is now **legacy / mostly obsolete** for the intended use case.
 
-- `config/tradie-keywords.txt`
-  - editable list of tradie / service keywords
-  - one keyword per line
-  - this is where you add or remove categories
+It is weaker because:
+- it often misses websites that actually exist
+- tradie coverage is poorer
+- it is better for generic POI collection than for lead generation
 
-### Output files
+Use it only if you specifically want the old map-tag-based approach.
 
-Generated files are written to `output/`, for example:
-- `google-maps-results.csv`
-- `google-maps-results.xlsx`
-- `tradies-brisbane-cbd-nearby-suburbs.csv`
-- `tradies-brisbane-cbd-nearby-suburbs.xlsx`
+---
 
-## Setup
+# 3. How the pipeline works, layer by layer
 
-This project is intended to run in the dedicated Conda environment created on this machine.
+## Layer 1. Google Maps discovery
 
-### Conda environment
+### Goal
+Find real businesses by searching Google Maps the way a customer would.
 
-```bash
-source /home/profile1/miniconda3/etc/profile.d/conda.sh
-conda activate local-business-scraper
-```
+### How it works
+The project opens Google Maps in headless Chromium, runs searches such as:
+- `plumbers in Brisbane CBD`
+- `locksmiths in Spring Hill Brisbane`
+- `solar panel installers in South Brisbane Brisbane`
 
-If the environment does not exist yet, create/update it from:
-
-```bash
-conda env create -f environment.yml
-```
-
-or, if it already exists:
-
-```bash
-conda env update -f environment.yml --prune
-```
-
-### Install Playwright browser runtime
-
-Run this once:
-
-```bash
-/home/profile1/miniconda3/envs/local-business-scraper/bin/python -m playwright install chromium
-```
-
-## How to run
-
-## 1. Recommended: multi-suburb tradies pipeline
-
-This is the main production-style workflow.
-
-It:
-- reads the suburb list from `config/brisbane-cbd-nearby-suburbs.txt`
-- reads tradie keywords from `config/tradie-keywords.txt`
-- runs all keyword × suburb searches in Google Maps
-- merges the results
-- removes duplicates
-- writes CSV and Excel output
-
-Run:
-
-```bash
-source /home/profile1/miniconda3/etc/profile.d/conda.sh
-conda activate local-business-scraper
-python run.py tradies --total-per-query 8
-```
-
-### What `--total-per-query` means
-It is the maximum number of Google Maps listings to collect for each search.
-
-For example, with:
-- 30 suburbs
-- 20 keywords
-- `--total-per-query 8`
-
-The pipeline may attempt up to:
-- 30 × 20 × 8 listing slots
-
-In practice, deduplication will reduce the final output.
-
-## 2. Single Google Maps query mode
-
-Use this when you want to test one search manually.
-
-Example:
-
-```bash
-source /home/profile1/miniconda3/etc/profile.d/conda.sh
-conda activate local-business-scraper
-python run.py google "plumbers in Brisbane CBD" --total 12
-```
-
-This writes:
-- `output/google-maps-results.csv`
-- `output/google-maps-results.xlsx`
-
-## 3. Legacy OSM mode
-
-This mode is still available, but it is no longer the recommended path.
-
-```bash
-source /home/profile1/miniconda3/etc/profile.d/conda.sh
-conda activate local-business-scraper
-python run.py "Brisbane CBD" --radius-km 2
-```
-
-Use it only if you specifically want the old OpenStreetMap-based approach.
-
-## Editable files you will likely change
-
-### Suburb list
-Edit:
-
-```text
-config/brisbane-cbd-nearby-suburbs.txt
-```
-
-One suburb per line.
-
-Current included suburbs:
-- Brisbane City
-- Spring Hill
-- Petrie Terrace
-- Fortitude Valley
-- New Farm
-- Teneriffe
-- Newstead
-- Kangaroo Point
-- South Brisbane
-- West End
-- Highgate Hill
-- Milton
-- Paddington
-- Red Hill
-- Herston
-- Bowen Hills
-- Woolloongabba
-- East Brisbane
-- Auchenflower
-- Toowong
-- Norman Park
-- Bulimba
-- Hawthorne
-- Balmoral
-- Ashgrove
-- Kelvin Grove
-- St Lucia
-- Dutton Park
-- Annerley
-- Greenslopes
-
-### Tradie keyword list
-Edit:
-
-```text
-config/tradie-keywords.txt
-```
-
-One keyword per line.
-
-Examples already included:
-- plumbers
-- locksmiths
-- carpenters
-- solar panel installers
-- waterproofing services
-- roofers
-- electricians
-- smart home installers
-- security system installers
-- stone masons
-- asbestos removal
-- elevator technicians
-
-## What the output contains
-
-Depending on the Google Maps listing, output rows may include:
-- query used
+It collects listing links, opens the listings one by one, and extracts:
 - business name
 - category
 - address
 - website
-- phone number
+- phone
 - rating
-- review count
-- service notes
-- opening hours
-- Google Maps listing URL
+- reviews count when possible
+- hours when possible
+- Google Maps URL
 
-The tradies pipeline now also adds a **website audit and lead scoring layer**:
+### Main file
+- `src/google_maps_scraper.py`
+
+### Why this layer exists
+This is the best current discovery source in the project for tradies and small service businesses.
+
+---
+
+## Layer 2. Geographic expansion through suburb lists
+
+### Goal
+Avoid relying on one overly broad query like `Brisbane`, which tends to favor bigger or more prominent businesses.
+
+### How it works
+Instead of only searching one central area, the pipeline reads a suburb list from:
+- `config/brisbane-cbd-nearby-suburbs.txt`
+
+Then it combines each suburb with each tradie keyword from:
+- `config/tradie-keywords.txt`
+
+Example combinations:
+- `plumbers in Brisbane City Brisbane`
+- `plumbers in Spring Hill Brisbane`
+- `locksmiths in South Brisbane Brisbane`
+- etc.
+
+### Why this layer exists
+This improves coverage of smaller local businesses and reduces the chance that Google only returns large, obvious players.
+
+---
+
+## Layer 3. Deduplication
+
+### Goal
+Remove the same business showing up multiple times across suburb and keyword searches.
+
+### How it works
+The pipeline compares businesses using combinations of:
+- name
+- phone
+- website
+- address
+- category
+
+If the same business appears multiple times, it is merged into one row in the final output.
+
+### Main file
+- `src/tradie_pipeline.py`
+
+### Why this layer exists
+Without deduplication, suburb-by-suburb searching would create a messy, repetitive spreadsheet.
+
+---
+
+## Layer 4. Website audit
+
+### Goal
+Decide whether the business has:
+- no website
+- a website that is unreachable/weak
+- a basic website
+- a more modern website
+
+### How it works
+For businesses with a website, the project checks signals like:
+- whether the website loads
+- whether it uses HTTPS
+- whether there is a contact form
+- whether there is quote/booking intent
+- whether there is a recent year signal on the site
+
+### Output fields
+Examples:
 - `website_status`
 - `website_quality`
 - `website_quality_score`
@@ -269,91 +167,347 @@ The tradies pipeline now also adds a **website audit and lead scoring layer**:
 - `has_contact_form`
 - `has_quote_intent`
 - `has_recent_year_signal`
+
+### Main file
+- `src/lead_scoring.py`
+
+### Why this layer exists
+A business with no website or a weak/basic site is often a strong website-sales target.
+
+---
+
+## Layer 5. Lead scoring
+
+### Goal
+Turn raw scraped data into sales-priority signals.
+
+### How it works
+The project scores businesses higher when they are:
+- strong tradie/service categories
+- missing a website
+- have a weak or unreachable site
+- have a listed phone number
+- show signs of being an active business
+- have weak quote/contact funnel signals
+
+### Output fields
+Examples:
 - `lead_score`
 - `lead_priority`
 - `target_reason`
 
-## Lead scoring and website audit logic
+### Interpretation
+- `high`: strongest website / CRM opportunity
+- `medium`: good opportunity, but less urgent or less clear
+- `low`: already has a more modern site or weaker fit
 
-The project now tries to classify each business into one of these website states:
-- `no_website`
-- `website_unreachable`
-- `has_website`
+### Why this layer exists
+This is what starts turning the sheet from raw data into a useful prospecting list.
 
-Then it scores website quality with a simple practical heuristic:
-- `none` = no website listed
-- `weak` = website missing / unreachable / very weak signals
-- `basic` = some modern signals but limited conversion features
-- `modern` = stronger modern signals
+---
 
-### Signals checked
+## Layer 6. Website enrichment
 
-The current audit checks things like:
-- does the business have a listed website
-- can the website actually load
-- does the website use HTTPS
-- is there a visible contact form
-- is there visible quote / booking intent
-- is there a recent year signal in the site content
+### Goal
+Go beyond the Google Maps listing and collect deeper signals directly from the business website.
 
-### Lead scoring logic
+### How it works
+The enrichment script:
+1. visits the homepage
+2. extracts emails, phones, socials, and contact hints
+3. follows deeper internal pages like:
+   - contact
+   - about
+   - quote
+   - booking
+   - services
+4. extracts more contact/social signals from those deeper pages
 
-This score is intentionally simple and sales-oriented.
+### Main file
+- `src/enrich_data.py`
 
-Businesses score higher when they are:
-- high-value tradie categories
-- missing a website
-- have a weak/unreachable website
-- have a phone number listed
-- have signs of real business activity
-- have no visible quote funnel or contact form
+### Why this layer exists
+The Google Maps listing is useful, but the website contains much richer commercial signals.
 
-### Practical interpretation
+---
 
-- `high` priority:
-  - strongest website / CRM opportunity
-  - usually no website or weak website plus strong tradie fit
+## Layer 7. Better contact enrichment
 
-- `medium` priority:
-  - may have a basic website but still a strong improvement opportunity
+### Goal
+Make contact details cleaner and more usable for outreach.
 
-- `low` priority:
-  - usually already has a more modern website or weaker commercial fit
+### How it works
+The enrichment layer now gives priority to:
+- explicit `mailto:` links for email
+- explicit `tel:` links for phone
+- internal contact/quote pages for better contact-page discovery
 
-This is not a perfect truth engine. It is a **sales targeting heuristic** to help sort the scraped list into more useful buckets.
+It also tries to:
+- normalize multiple phone-number variants
+- choose a single best phone number
+- store the best contact page URL
 
-## Known limitations
+### Output fields
+Examples:
+- `enriched_emails_found`
+- `enriched_phones_found`
+- `enriched_best_phone`
+- `enriched_contact_page_urls`
+- `enriched_contact_page_best_url`
 
-- Google Maps scraping is more useful than the old OSM pipeline, but it is also more brittle.
-- Google can change page structure at any time.
-- Some businesses may appear in multiple suburb/keyword searches, so deduplication is necessary.
-- Review count extraction is still weaker than name/website/phone extraction.
-- Email extraction is not yet part of the main pipeline.
+### Why this layer exists
+Raw website scraping can be noisy. This layer is meant to make the data more usable for actual outreach.
 
-## Recommended workflow
+---
 
-If you want the best current result:
+## Layer 8. Social extraction
 
-1. edit suburb list if needed
-2. edit tradie keyword list if needed
-3. run:
+### Goal
+Capture the business’s social presence from the website.
+
+### How it works
+The enrichment layer scans the site and deeper pages for links to:
+- Facebook
+- Instagram
+- LinkedIn
+- YouTube
+- TikTok
+
+It stores both:
+- high-level presence signals
+- exact extracted URLs
+
+### Output fields
+Examples:
+- `enriched_social_links`
+- `enriched_facebook_url`
+- `enriched_instagram_url`
+- `enriched_linkedin_url`
+- `enriched_youtube_url`
+- `enriched_tiktok_url`
+
+### Why this layer exists
+Some businesses may have weak websites but strong social presence, which is commercially relevant.
+
+---
+
+## Layer 9. Social relevance scoring
+
+### Goal
+Estimate whether an extracted social link is actually relevant to the business.
+
+### How it works
+This layer compares:
+- business name
+- social URL slug / handle / path
+
+Examples:
+- a handle like `mitchellplumbinggas` is a strong match for `Mitchell Plumbing & Gas`
+- an unrelated page like `MPAQAwards` is a weak match for `The Brisbane Plumbers`
+
+### Output fields
+Examples:
+- `enriched_facebook_relevance_score`
+- `enriched_facebook_relevance_confidence`
+- `enriched_facebook_relevance_reason`
+- `enriched_social_relevance_best_score`
+- `enriched_social_relevance_best_confidence`
+- `enriched_social_relevance_best_reason`
+
+### Why this layer exists
+Not every extracted social link is actually the business’s official profile.
+
+---
+
+# 4. Main files and what each one does
+
+## Root / entry point
+- `run.py`
+  - main command entry point
+  - routes to different modes:
+    - legacy OSM mode
+    - single-query Google mode
+    - suburb-based tradies pipeline
+    - enrichment mode
+
+## Discovery / scraping
+- `src/google_maps_scraper.py`
+  - Google Maps listing discovery and extraction
+
+- `src/business_scraper.py`
+  - old OpenStreetMap pipeline, legacy
+
+## Pipeline orchestration
+- `src/tradie_pipeline.py`
+  - combines suburb list + tradie keywords
+  - runs searches
+  - deduplicates results
+  - writes tradies output files
+
+## Website audit and scoring
+- `src/lead_scoring.py`
+  - website classification
+  - lead scoring
+
+## Deep enrichment
+- `src/enrich_data.py`
+  - website enrichment
+  - deeper internal-page crawling
+  - contact/social extraction
+  - social URL extraction
+  - contact-page discovery
+
+- `src/social_relevance.py`
+  - scores whether social URLs look relevant to the business
+
+- `src/phone_utils.py`
+  - phone normalization
+  - best phone selection
+
+## Config files
+- `config/brisbane-cbd-nearby-suburbs.txt`
+  - editable suburb list
+
+- `config/tradie-keywords.txt`
+  - editable tradie category list
+
+---
+
+# 5. What the config files do
+
+## `config/brisbane-cbd-nearby-suburbs.txt`
+One suburb per line.
+
+Used to control where the suburb-by-suburb pipeline searches.
+
+Change this file when you want to:
+- expand to more suburbs
+- narrow to tighter local areas
+- use another city pattern later
+
+## `config/tradie-keywords.txt`
+One tradie/business keyword per line.
+
+Examples:
+- plumbers
+- locksmiths
+- carpenters
+- electricians
+- roofers
+- waterproofing services
+
+Change this file when you want to:
+- add new categories
+- remove categories
+- focus on a specific niche
+
+---
+
+# 6. Outputs and what they mean
+
+Outputs are written into `output/`.
+
+Examples:
+- `google-maps-results.csv`
+- `google-maps-results.xlsx`
+- `tradies-brisbane-cbd-nearby-suburbs.csv`
+- `tradies-brisbane-cbd-nearby-suburbs.xlsx`
+- `enriched-results.csv`
+- `enriched-results.xlsx`
+- small test outputs used during development
+
+## Typical row content after scraping + scoring + enrichment
+A row can now include:
+- search query
+- business name
+- category
+- address
+- website
+- phone
+- rating
+- maps URL
+- website status / quality
+- lead score / priority
+- target reason
+- found emails
+- normalized phones
+- best phone
+- contact page URLs
+- best contact page URL
+- social URLs
+- social relevance scores
+- deep pages crawled
+
+---
+
+# 7. Setup
+
+## Conda environment
 
 ```bash
+source /home/profile1/miniconda3/etc/profile.d/conda.sh
+conda activate local-business-scraper
+```
+
+If needed:
+
+```bash
+conda env create -f environment.yml
+```
+
+or update:
+
+```bash
+conda env update -f environment.yml --prune
+```
+
+## Install Playwright browser runtime
+
+Run once:
+
+```bash
+/home/profile1/miniconda3/envs/local-business-scraper/bin/python -m playwright install chromium
+```
+
+---
+
+# 8. How to run each part
+
+## A. Main suburb-based tradies pipeline
+
+This is the main discovery workflow.
+
+```bash
+source /home/profile1/miniconda3/etc/profile.d/conda.sh
+conda activate local-business-scraper
 python run.py tradies --total-per-query 8
 ```
 
-4. inspect the final deduplicated CSV/XLSX in `output/`
+### What it does
+- reads suburb file
+- reads tradie keyword file
+- runs Google Maps queries
+- deduplicates results
+- applies website audit and lead scoring
+- writes final CSV/XLSX
 
-## Enrichment layer
+---
 
-A separate enrichment script is now included.
+## B. Single Google Maps query
 
-Purpose:
-- take an existing scraped CSV
-- visit each listed website
-- extract extra signals from the website itself
+Use this for a quick targeted test.
 
-Run it like this:
+```bash
+source /home/profile1/miniconda3/etc/profile.d/conda.sh
+conda activate local-business-scraper
+python run.py google "plumbers in Brisbane CBD" --total 12
+```
+
+---
+
+## C. Enrichment mode
+
+Use this after you already have a CSV and want deeper website/contact/social data.
 
 ```bash
 source /home/profile1/miniconda3/etc/profile.d/conda.sh
@@ -361,81 +515,119 @@ conda activate local-business-scraper
 python run.py enrich output/tradies-brisbane-cbd-nearby-suburbs.csv --output-csv output/enriched-results.csv --output-xlsx output/enriched-results.xlsx
 ```
 
-Current enrichment fields include:
-- `enriched_final_url`
-- `enriched_page_title`
-- `enriched_emails_found`
-- `enriched_phones_found`
-- `enriched_best_phone`
-- `enriched_contact_hints`
-- `enriched_contact_page_urls`
-- `enriched_contact_page_best_url`
-- `enriched_social_links`
-- `enriched_facebook_url`
-- `enriched_instagram_url`
-- `enriched_linkedin_url`
-- `enriched_youtube_url`
-- `enriched_tiktok_url`
-- `enriched_directory_mentions`
-- `enriched_deep_pages_checked`
-- `enriched_deep_page_urls`
-- `enriched_notes`
+### What it does
+- visits websites from the existing CSV
+- crawls deeper internal pages
+- extracts better contact info
+- extracts social URLs
+- scores social relevance
 
-The enrichment step now also:
-- follows key internal pages like contact/about/quote/services
-- extracts explicit `mailto:` links
-- extracts explicit `tel:` links
-- stores exact social URLs
-- picks a best contact page URL
-- normalizes phone variants and chooses a best phone
-- filters some obvious phone-number noise better than before
+---
 
-## Enrichment ideas from here
+## D. Legacy OSM mode
 
-Your instinct is right. The best next enrichment layers are:
+Still available, but no longer recommended for the main business use case.
 
-### 1. Visit each official website
-This is the best first move.
+```bash
+source /home/profile1/miniconda3/etc/profile.d/conda.sh
+conda activate local-business-scraper
+python run.py "Brisbane CBD" --radius-km 2
+```
 
-Why:
-- high confidence source
-- can extract emails, forms, booking/quote intent, socials, and trust signals
-- can judge whether the site looks weak or modern
+---
 
-### 2. For businesses with no website, search for external presence
-For smaller businesses with no official site, useful fallback sources are:
-- Google search results
-- Instagram
-- Facebook
-- TripAdvisor
-- Yelp
-- Yellow Pages
-- local trade directories like hipages / Oneflare
+# 9. Recommended workflow
 
-This can help identify businesses that:
-- truly have no website
-- only rely on social media
-- have directory-only presence
-- are still good targets for a website + CRM offer
+If you want the best current commercial workflow, do this:
 
-### 3. Split the sales opportunity into two types
-This is probably the smartest commercial framing:
+1. edit suburb list if needed
+2. edit tradie keyword list if needed
+3. run the main tradies pipeline
+4. inspect the scored output
+5. run enrichment on that output
+6. inspect the enriched file for:
+   - best phone
+   - emails
+   - contact page
+   - social URLs
+   - social relevance
 
-- **Website lead**
-  - no website
-  - weak/outdated website
+In practice:
 
-- **CRM lead**
-  - website exists
-  - but weak lead capture, no quote funnel, no automation, weak follow-up
+```bash
+python run.py tradies --total-per-query 8
+python run.py enrich output/tradies-brisbane-cbd-nearby-suburbs.csv --output-csv output/enriched-results.csv --output-xlsx output/enriched-results.xlsx
+```
 
-That means some businesses with modern-ish websites could still be valuable CRM leads.
+---
 
-## Future improvements
+# 10. What the project is trying to help sell
 
-Planned / useful next upgrades:
-- search Google / social / directory presence for no-website businesses
-- improve review count extraction
-- stronger deduplication logic
-- add confidence/source scoring
-- optionally swap discovery over to Google Places API for more stability
+The business logic behind the pipeline is roughly:
+- identify businesses that need a website
+- identify businesses that have a weak/basic website
+- identify businesses that may still need CRM/process improvement even if the site is okay
+
+That means there are at least two commercial angles:
+
+## Website lead
+Best signs:
+- no website
+- unreachable website
+- weak/basic website
+- no quote/contact funnel
+
+## CRM lead
+Best signs:
+- website exists
+- but weak contact capture
+- weak quote/booking flow
+- weak follow-up / process clues
+
+The project is moving toward supporting both of those lead types.
+
+---
+
+# 11. Current limitations
+
+This is a real working system, but not perfect.
+
+## Known limitations
+- Google Maps scraping is inherently brittle because Google can change page structure.
+- Phone extraction is much improved, but still not perfect in every edge case.
+- Social extraction is useful, but some extracted social links may still be weakly relevant.
+- Review-count extraction is still weaker than name/website/phone extraction.
+- The social relevance layer is still an early heuristic.
+- No-website fallback discovery (Google/Instagram/directories) is not fully built yet.
+
+---
+
+# 12. What the next logical steps are
+
+The strongest next upgrades would be:
+
+1. **No-website fallback discovery**
+   - Google/social/directory discovery for businesses with no listed website
+
+2. **Better CRM-side scoring**
+   - separate website-redesign leads from CRM/process leads
+
+3. **Confidence scoring per field**
+   - how trustworthy each email, phone, social, and website signal is
+
+4. **Outreach-ready fields**
+   - best contact channel
+   - likely offer angle
+   - short commercial summary
+
+---
+
+# 13. Quick summary
+
+If you only remember one thing:
+
+- **Use `tradies` mode for discovery and lead scoring**
+- **Use `enrich` mode for deeper contact + social + website data**
+- **Treat OSM mode as legacy**
+
+This project is now a multi-layer prospecting pipeline, not just a basic scraper.

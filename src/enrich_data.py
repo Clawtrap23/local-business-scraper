@@ -3,7 +3,7 @@ import argparse
 import csv
 import re
 from pathlib import Path
-from typing import Dict, List, Set
+from typing import Dict, List, Set, Tuple
 from urllib.parse import unquote, urljoin, urlparse
 
 import requests
@@ -21,6 +21,7 @@ TEL_RE = re.compile(r"tel:([^\"'>\s]+)", re.I)
 MAILTO_RE = re.compile(r"mailto:([^\"'>\s?]+)", re.I)
 
 CONTACT_HINTS = ["contact", "quote", "book", "booking", "enquiry", "inquiry", "service"]
+CONTACT_LINK_HINTS = ["contact", "quote", "book", "booking", "enquiry", "inquiry"]
 SOCIAL_HINTS = ["facebook.com", "instagram.com", "linkedin.com", "youtube.com", "tiktok.com"]
 SOCIAL_DOMAINS = {
     "facebook": "facebook.com",
@@ -80,6 +81,8 @@ def normalize_phone(value: str) -> str:
     digits = re.sub(r"\D", "", value)
     if len(digits) < 8 or len(digits) > 15:
         return ""
+    if value.count('.') >= 2:
+        return ""
     if digits.startswith("61") and not value.startswith("+"):
         return f"+{digits}"
     if value.startswith("+"):
@@ -89,13 +92,21 @@ def normalize_phone(value: str) -> str:
 
 def extract_phones(html: str) -> Set[str]:
     cleaned = set()
-    for raw in PHONE_RE.findall(html):
-        phone = normalize_phone(raw)
-        if phone:
-            cleaned.add(phone)
+    tel_links = []
     for raw in TEL_RE.findall(html):
         phone = normalize_phone(raw)
         if phone:
+            tel_links.append(phone)
+            cleaned.add(phone)
+    if tel_links:
+        return set(tel_links)
+
+    for raw in PHONE_RE.findall(html):
+        phone = normalize_phone(raw)
+        if not phone:
+            continue
+        digits = re.sub(r'\D', '', phone)
+        if digits.startswith('0') or digits.startswith('61') or len(digits) in {8, 10, 11}:
             cleaned.add(phone)
     return cleaned
 
@@ -154,7 +165,7 @@ def normalize_social_url(key: str, url: str) -> str:
 
     if key == 'youtube':
         parts = [p for p in path.split('/') if p]
-        if len(parts) >= 2 and parts[0] in {'@', 'channel', 'c', 'user'}:
+        if len(parts) >= 2 and parts[0] in {'channel', 'c', 'user'}:
             return f'{parsed.scheme}://{parsed.netloc}/{parts[0]}/{parts[1]}'
         if parts and parts[0].startswith('@'):
             return f'{parsed.scheme}://{parsed.netloc}/{parts[0]}'
@@ -203,12 +214,37 @@ def extract_internal_links(base_url: str, html: str) -> List[str]:
     return deduped[:MAX_DEEP_PAGES]
 
 
+def extract_contact_links(base_url: str, html: str) -> List[str]:
+    parsed_base = urlparse(base_url)
+    links = []
+    for link in extract_all_links(base_url, html):
+        parsed = urlparse(link)
+        lowered = link.lower()
+        if parsed.netloc != parsed_base.netloc:
+            continue
+        if any(lowered.endswith(ext) for ext in ['.css', '.js', '.png', '.jpg', '.jpeg', '.svg', '.webp', '.gif', '.pdf', '.xml']):
+            continue
+        if '/wp-content/' in lowered or '/wp-json/' in lowered or '/feed/' in lowered:
+            continue
+        if any(hint in lowered for hint in CONTACT_LINK_HINTS):
+            links.append(link)
+    deduped = []
+    seen = set()
+    for link in links:
+        if link not in seen:
+            seen.add(link)
+            deduped.append(link)
+    return deduped[:5]
+
+
 def set_empty_enrichment(row: Dict[str, str], notes: str, contact_hints: str) -> Dict[str, str]:
     row["enriched_final_url"] = ""
     row["enriched_page_title"] = ""
     row["enriched_emails_found"] = ""
     row["enriched_phones_found"] = ""
     row["enriched_contact_hints"] = contact_hints
+    row["enriched_contact_page_urls"] = ""
+    row["enriched_contact_page_best_url"] = ""
     row["enriched_social_links"] = ""
     row["enriched_facebook_url"] = ""
     row["enriched_instagram_url"] = ""
@@ -220,6 +256,22 @@ def set_empty_enrichment(row: Dict[str, str], notes: str, contact_hints: str) ->
     row["enriched_deep_page_urls"] = ""
     row["enriched_notes"] = notes
     return row
+
+
+def choose_best_contact_url(contact_links: List[str]) -> str:
+    if not contact_links:
+        return ""
+    ranked: List[Tuple[int, str]] = []
+    for link in contact_links:
+        score = 0
+        lowered = link.lower()
+        if 'contact' in lowered:
+            score += 3
+        if 'quote' in lowered or 'book' in lowered or 'enquiry' in lowered or 'inquiry' in lowered:
+            score += 2
+        ranked.append((score, link))
+    ranked.sort(reverse=True)
+    return ranked[0][1]
 
 
 def enrich_row(row: Dict[str, str]) -> Dict[str, str]:
@@ -238,6 +290,7 @@ def enrich_row(row: Dict[str, str]) -> Dict[str, str]:
     directories = detect_directories(html_lower)
     social_urls = extract_social_urls(final_url, html)
     deep_links = extract_internal_links(final_url, html)
+    contact_links = extract_contact_links(final_url, html)
 
     for link in deep_links:
         _, deep_html = fetch(link)
@@ -260,6 +313,8 @@ def enrich_row(row: Dict[str, str]) -> Dict[str, str]:
     row["enriched_emails_found"] = " ; ".join(sorted(emails))
     row["enriched_phones_found"] = " ; ".join(sorted(phones)[:8])
     row["enriched_contact_hints"] = detect_contact_hints(html_lower)
+    row["enriched_contact_page_urls"] = " ; ".join(contact_links)
+    row["enriched_contact_page_best_url"] = choose_best_contact_url(contact_links)
     row["enriched_social_links"] = ", ".join(sorted(socials))
     row["enriched_facebook_url"] = social_urls.get("facebook", "")
     row["enriched_instagram_url"] = social_urls.get("instagram", "")

@@ -857,13 +857,17 @@ conda activate local-business-scraper
 python run.py tradies --total-per-query 8
 ```
 
+Note:
+- Google Maps collection is now hard capped at **20 results per query** even if a higher number is requested.
+- The tradies pipeline now saves checkpoint output after each query.
+
 ### What it does
 - reads suburb file
 - reads tradie keyword file
 - runs Google Maps queries
 - deduplicates results
 - applies website audit and lead scoring
-- writes final CSV/XLSX
+- writes checkpoint CSV/XLSX after each query so progress is not lost
 
 ---
 

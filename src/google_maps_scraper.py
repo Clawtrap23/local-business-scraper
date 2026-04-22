@@ -13,6 +13,7 @@ from openpyxl import Workbook
 from playwright.sync_api import Browser, Page, sync_playwright
 
 DEFAULT_OUTPUT_DIR = "output"
+MAX_RESULTS_PER_QUERY = 20
 DEFAULT_QUERIES = [
     "plumbers in Brisbane CBD",
     "locksmiths in Brisbane CBD",
@@ -125,6 +126,7 @@ class GoogleMapsScraper:
 
     @staticmethod
     def _collect_listing_links(page: Page, total: int) -> List[str]:
+        total = min(total, MAX_RESULTS_PER_QUERY)
         anchor_selector = 'a[href*="/maps/place/"]'
         try:
             results_panel = page.locator('div[role="feed"], div[aria-label*="Results for"], div[aria-label*="Results"]')
@@ -273,7 +275,7 @@ def slugify(value: str) -> str:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Scrape Google Maps listings for tradies and small businesses.")
     parser.add_argument("queries", nargs="*", help="One or more Google Maps search queries")
-    parser.add_argument("--total", type=int, default=10, help="Maximum results per query")
+    parser.add_argument("--total", type=int, default=10, help=f"Maximum results per query (hard capped at {MAX_RESULTS_PER_QUERY})")
     parser.add_argument("--output-dir", default=DEFAULT_OUTPUT_DIR, help="Output directory")
     parser.add_argument("--headed", action="store_true", help="Use a visible browser")
     return parser.parse_args()

@@ -13,6 +13,7 @@ from src.lead_scoring import classify_website
 DEFAULT_SUBURBS_FILE = "config/brisbane-cbd-nearby-suburbs.txt"
 DEFAULT_KEYWORDS_FILE = "config/tradie-keywords.txt"
 DEFAULT_OUTPUT_DIR = "output"
+CHECKPOINT_BASENAME = "tradies-brisbane-cbd-nearby-suburbs"
 
 
 def read_lines(path: Path) -> List[str]:
@@ -71,54 +72,69 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def apply_audit(row: Business) -> Business:
+    audit = classify_website(row)
+    row.website_status = audit.website_status
+    row.website_quality = audit.website_quality
+    row.website_quality_score = str(audit.website_quality_score)
+    row.website_notes = audit.website_notes
+    row.has_contact_form = audit.has_contact_form
+    row.has_quote_intent = audit.has_quote_intent
+    row.has_recent_year_signal = audit.has_recent_year_signal
+    row.lead_score = str(audit.lead_score)
+    row.lead_priority = audit.lead_priority
+    row.target_reason = audit.target_reason
+    row.website_lead_score = str(audit.website_lead_score)
+    row.website_lead_priority = audit.website_lead_priority
+    row.website_lead_reason = audit.website_lead_reason
+    row.crm_lead_score = str(audit.crm_lead_score)
+    row.crm_lead_priority = audit.crm_lead_priority
+    row.crm_lead_reason = audit.crm_lead_reason
+    row.crm_maturity_score = str(audit.crm_maturity_score)
+    row.crm_maturity_level = audit.crm_maturity_level
+    row.crm_detected_tools = audit.crm_detected_tools
+    row.crm_detected_forms = audit.crm_detected_forms
+    row.crm_detected_booking_signals = audit.crm_detected_booking_signals
+    row.crm_detected_chat_widgets = audit.crm_detected_chat_widgets
+    row.crm_detected_portal_signals = audit.crm_detected_portal_signals
+    row.crm_operational_complexity = audit.crm_operational_complexity
+    row.best_offer_type = audit.best_offer_type
+    row.outreach_angle = audit.outreach_angle
+    return row
+
+
+def write_checkpoint(output_dir: Path, rows: List[Business]) -> tuple[Path, Path]:
+    csv_path = output_dir / f"{CHECKPOINT_BASENAME}.csv"
+    xlsx_path = output_dir / f"{CHECKPOINT_BASENAME}.xlsx"
+    write_csv(csv_path, rows)
+    write_xlsx(xlsx_path, rows)
+    return csv_path, xlsx_path
+
+
 def main() -> int:
     args = parse_args()
     suburbs = read_lines(Path(args.suburbs_file))
     keywords = read_lines(Path(args.keywords_file))
     scraper = GoogleMapsScraper(headless=not args.headed)
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
     all_rows: List[Business] = []
+    audited: List[Business] = []
+
     for suburb in suburbs:
         for keyword in keywords:
             query = f"{keyword} in {suburb} Brisbane"
             print(f"Running: {query}")
-            all_rows.extend(scraper.scrape_query(query, args.total_per_query))
-    deduped = dedupe_businesses(all_rows)
-    audited: List[Business] = []
-    for row in deduped:
-        audit = classify_website(row)
-        row.website_status = audit.website_status
-        row.website_quality = audit.website_quality
-        row.website_quality_score = str(audit.website_quality_score)
-        row.website_notes = audit.website_notes
-        row.has_contact_form = audit.has_contact_form
-        row.has_quote_intent = audit.has_quote_intent
-        row.has_recent_year_signal = audit.has_recent_year_signal
-        row.lead_score = str(audit.lead_score)
-        row.lead_priority = audit.lead_priority
-        row.target_reason = audit.target_reason
-        row.website_lead_score = str(audit.website_lead_score)
-        row.website_lead_priority = audit.website_lead_priority
-        row.website_lead_reason = audit.website_lead_reason
-        row.crm_lead_score = str(audit.crm_lead_score)
-        row.crm_lead_priority = audit.crm_lead_priority
-        row.crm_lead_reason = audit.crm_lead_reason
-        row.crm_maturity_score = str(audit.crm_maturity_score)
-        row.crm_maturity_level = audit.crm_maturity_level
-        row.crm_detected_tools = audit.crm_detected_tools
-        row.crm_detected_forms = audit.crm_detected_forms
-        row.crm_detected_booking_signals = audit.crm_detected_booking_signals
-        row.crm_detected_chat_widgets = audit.crm_detected_chat_widgets
-        row.crm_detected_portal_signals = audit.crm_detected_portal_signals
-        row.crm_operational_complexity = audit.crm_operational_complexity
-        row.best_offer_type = audit.best_offer_type
-        row.outreach_angle = audit.outreach_angle
-        audited.append(row)
-    output_dir = Path(args.output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    csv_path = output_dir / "tradies-brisbane-cbd-nearby-suburbs.csv"
-    xlsx_path = output_dir / "tradies-brisbane-cbd-nearby-suburbs.xlsx"
-    write_csv(csv_path, audited)
-    write_xlsx(xlsx_path, audited)
+            batch_rows = scraper.scrape_query(query, args.total_per_query)
+            all_rows.extend(batch_rows)
+            deduped = dedupe_businesses(all_rows)
+            audited = [apply_audit(row) for row in deduped]
+            csv_path, xlsx_path = write_checkpoint(output_dir, audited)
+            print(f"Checkpoint rows after query: {len(audited)}")
+            print(f"Checkpoint CSV: {csv_path}")
+            print(f"Checkpoint XLSX: {xlsx_path}")
+
     print(f"Raw rows: {len(all_rows)}")
     print(f"Deduped rows: {len(deduped)}")
     print(f"Audited rows: {len(audited)}")

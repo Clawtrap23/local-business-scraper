@@ -366,7 +366,10 @@ Current enrichment fields include:
 - `enriched_page_title`
 - `enriched_emails_found`
 - `enriched_phones_found`
+- `enriched_best_phone`
 - `enriched_contact_hints`
+- `enriched_contact_page_urls`
+- `enriched_contact_page_best_url`
 - `enriched_social_links`
 - `enriched_facebook_url`
 - `enriched_instagram_url`
@@ -382,6 +385,9 @@ The enrichment step now also:
 - follows key internal pages like contact/about/quote/services
 - extracts explicit `mailto:` links
 - extracts explicit `tel:` links
+- stores exact social URLs
+- picks a best contact page URL
+- normalizes phone variants and chooses a best phone
 - filters some obvious phone-number noise better than before
 
 ## Enrichment ideas from here

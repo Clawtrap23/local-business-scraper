@@ -9,6 +9,7 @@ from urllib.parse import unquote, urljoin, urlparse
 import requests
 from openpyxl import Workbook
 
+from src.phone_utils import choose_best_phone, dedupe_phone_variants
 from src.social_relevance import score_social_relevance
 
 TIMEOUT = 20
@@ -242,6 +243,7 @@ def set_empty_enrichment(row: Dict[str, str], notes: str, contact_hints: str) ->
     row["enriched_page_title"] = ""
     row["enriched_emails_found"] = ""
     row["enriched_phones_found"] = ""
+    row["enriched_best_phone"] = ""
     row["enriched_contact_hints"] = contact_hints
     row["enriched_contact_page_urls"] = ""
     row["enriched_contact_page_best_url"] = ""
@@ -310,8 +312,10 @@ def enrich_row(row: Dict[str, str]) -> Dict[str, str]:
 
     row["enriched_final_url"] = final_url
     row["enriched_page_title"] = extract_title(html)
+    normalized_phones = dedupe_phone_variants(phones)
     row["enriched_emails_found"] = " ; ".join(sorted(emails))
-    row["enriched_phones_found"] = " ; ".join(sorted(phones)[:8])
+    row["enriched_phones_found"] = " ; ".join(normalized_phones[:8])
+    row["enriched_best_phone"] = choose_best_phone(normalized_phones, row.get("phone", ""))
     row["enriched_contact_hints"] = detect_contact_hints(html_lower)
     row["enriched_contact_page_urls"] = " ; ".join(contact_links)
     row["enriched_contact_page_best_url"] = choose_best_contact_url(contact_links)

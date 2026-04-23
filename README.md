@@ -895,6 +895,9 @@ Run logs:
 - `output/logs/<mode>-<timestamp>.log`
 - `output/logs/<mode>-<timestamp>.error.log`
 
+Timing metrics:
+- `output/tradies-brisbane-cbd-nearby-suburbs-metrics.json`
+
 ### Resume behavior
 
 If a run is interrupted:
@@ -920,6 +923,8 @@ The logger stores:
 - stdout progress messages
 - stderr/error output
 - final success or failure status
+- total run duration
+- start and finish timestamps
 
 This makes it easier to review:
 - what command was launched
@@ -927,9 +932,27 @@ This makes it easier to review:
 - what error messages appeared if something failed
 
 Typical files per run:
-- metadata JSON with command and status
+- metadata JSON with command, status, timestamps, and total duration
 - main `.log` file with normal progress output
 - `.error.log` file with stderr and traceback output
+
+### Tradies timing metrics
+
+The `tradies` pipeline now also writes a dedicated metrics file:
+
+- `output/tradies-brisbane-cbd-nearby-suburbs-metrics.json`
+
+This file includes:
+- total run duration
+- how many queries were processed
+- how many queries were expected
+- per-query duration
+- per-query batch row count
+- deduped row count after each query
+- audited row count after each query
+- whether that query wrote an XLSX checkpoint
+
+Per-query timing is also echoed into the normal run log output.
 
 ### CRM scoring optimization behavior
 

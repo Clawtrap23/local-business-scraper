@@ -2,9 +2,10 @@
 import argparse
 import csv
 import json
+import time
 from dataclasses import asdict
 from pathlib import Path
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Set
 
 from openpyxl import Workbook
 
@@ -17,6 +18,7 @@ DEFAULT_OUTPUT_DIR = "output"
 CHECKPOINT_BASENAME = "tradies-brisbane-cbd-nearby-suburbs"
 STATE_FILENAME = f"{CHECKPOINT_BASENAME}-state.json"
 AUDIT_CACHE_FILENAME = f"{CHECKPOINT_BASENAME}-audit-cache.json"
+METRICS_FILENAME = f"{CHECKPOINT_BASENAME}-metrics.json"
 XLSX_CHECKPOINT_EVERY = 5
 
 
@@ -152,11 +154,11 @@ def write_state(path: Path, state: dict) -> None:
 
 def load_state(path: Path) -> dict:
     if not path.exists():
-        return {"completed_queries": [], "raw_rows": []}
+        return {"completed_queries": [], "raw_rows": [], "query_metrics": []}
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
-        return {"completed_queries": [], "raw_rows": []}
+        return {"completed_queries": [], "raw_rows": [], "query_metrics": []}
 
 
 def load_audit_cache(path: Path) -> Dict[str, dict]:
@@ -173,6 +175,10 @@ def save_audit_cache(path: Path, cache: Dict[str, dict]) -> None:
     path.write_text(json.dumps(cache, indent=2, sort_keys=True), encoding="utf-8")
 
 
+def write_metrics(path: Path, metrics: dict) -> None:
+    path.write_text(json.dumps(metrics, indent=2, sort_keys=True), encoding="utf-8")
+
+
 def write_checkpoint(output_dir: Path, rows: List[Business], query_index: int, final: bool = False) -> tuple[Path, Path | None]:
     csv_path = output_dir / f"{CHECKPOINT_BASENAME}.csv"
     write_csv(csv_path, rows)
@@ -186,6 +192,7 @@ def write_checkpoint(output_dir: Path, rows: List[Business], query_index: int, f
 
 def main() -> int:
     args = parse_args()
+    run_started = time.time()
     suburbs = read_lines(Path(args.suburbs_file))
     keywords = read_lines(Path(args.keywords_file))
     scraper = GoogleMapsScraper(headless=not args.headed)
@@ -194,9 +201,10 @@ def main() -> int:
 
     state_path = output_dir / STATE_FILENAME
     audit_cache_path = output_dir / AUDIT_CACHE_FILENAME
+    metrics_path = output_dir / METRICS_FILENAME
 
     if args.fresh:
-        state = {"completed_queries": [], "raw_rows": []}
+        state = {"completed_queries": [], "raw_rows": [], "query_metrics": []}
         audit_cache: Dict[str, dict] = {}
     else:
         state = load_state(state_path)
@@ -204,6 +212,7 @@ def main() -> int:
 
     completed_queries = set(state.get("completed_queries", []))
     raw_rows = [Business(**row) for row in state.get("raw_rows", [])]
+    query_metrics = list(state.get("query_metrics", []))
     all_rows: List[Business] = raw_rows[:]
     processed_queries = len(completed_queries)
     total_queries = len(suburbs) * len(keywords)
@@ -220,6 +229,7 @@ def main() -> int:
                 print(f"Skipping completed query: {query}")
                 continue
 
+            query_started = time.time()
             print(f"Running ({processed_queries + 1}/{total_queries}): {query}")
             batch_rows = scraper.scrape_query(query, args.total_per_query)
             all_rows.extend(batch_rows)
@@ -233,13 +243,36 @@ def main() -> int:
             if maybe_xlsx_path:
                 xlsx_path = maybe_xlsx_path
 
+            query_duration = round(time.time() - query_started, 3)
+            metric = {
+                "query": query,
+                "query_index": processed_queries,
+                "batch_rows": len(batch_rows),
+                "deduped_rows_after_query": len(deduped),
+                "audited_rows_after_query": len(audited),
+                "duration_seconds": query_duration,
+                "wrote_xlsx": bool(maybe_xlsx_path),
+            }
+            query_metrics.append(metric)
+
             state = {
                 "completed_queries": sorted(completed_queries),
                 "raw_rows": [asdict(row) for row in all_rows],
+                "query_metrics": query_metrics,
             }
             write_state(state_path, state)
             save_audit_cache(audit_cache_path, audit_cache)
+            write_metrics(
+                metrics_path,
+                {
+                    "total_duration_seconds": round(time.time() - run_started, 3),
+                    "processed_queries": processed_queries,
+                    "total_queries": total_queries,
+                    "query_metrics": query_metrics,
+                },
+            )
 
+            print(f"Query duration seconds: {query_duration}")
             print(f"Checkpoint rows after query: {len(audited)}")
             print(f"Checkpoint CSV: {csv_path}")
             if maybe_xlsx_path:
@@ -247,14 +280,29 @@ def main() -> int:
             else:
                 print("Checkpoint XLSX: skipped this round")
 
+    total_duration = round(time.time() - run_started, 3)
     csv_path, xlsx_path = write_checkpoint(output_dir, audited, processed_queries or 1, final=True)
     state = {
         "completed_queries": sorted(completed_queries),
         "raw_rows": [asdict(row) for row in all_rows],
+        "query_metrics": query_metrics,
     }
     write_state(state_path, state)
     save_audit_cache(audit_cache_path, audit_cache)
+    write_metrics(
+        metrics_path,
+        {
+            "total_duration_seconds": total_duration,
+            "processed_queries": processed_queries,
+            "total_queries": total_queries,
+            "query_metrics": query_metrics,
+            "raw_rows": len(all_rows),
+            "deduped_rows": len(deduped),
+            "audited_rows": len(audited),
+        },
+    )
 
+    print(f"Total duration seconds: {total_duration}")
     print(f"Raw rows: {len(all_rows)}")
     print(f"Deduped rows: {len(deduped)}")
     print(f"Audited rows: {len(audited)}")
@@ -262,6 +310,7 @@ def main() -> int:
     print(f"XLSX: {xlsx_path}")
     print(f"State: {state_path}")
     print(f"Audit cache: {audit_cache_path}")
+    print(f"Metrics: {metrics_path}")
     return 0
 
 

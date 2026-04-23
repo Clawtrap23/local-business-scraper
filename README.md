@@ -890,6 +890,11 @@ Resume and cache files:
 - `output/tradies-brisbane-cbd-nearby-suburbs-state.json`
 - `output/tradies-brisbane-cbd-nearby-suburbs-audit-cache.json`
 
+Run logs:
+- `output/logs/<mode>-<timestamp>.json`
+- `output/logs/<mode>-<timestamp>.log`
+- `output/logs/<mode>-<timestamp>.error.log`
+
 ### Resume behavior
 
 If a run is interrupted:
@@ -904,6 +909,27 @@ If you want to ignore saved state and start over from scratch, run the tradies p
 ```bash
 python run.py tradies --fresh
 ```
+
+### Run logging behavior
+
+Each `run.py` execution now creates persistent log files in `output/logs/`.
+
+The logger stores:
+- the exact launched command
+- the mode used (`tradies`, `google`, `enrich`, or legacy `osm`)
+- stdout progress messages
+- stderr/error output
+- final success or failure status
+
+This makes it easier to review:
+- what command was launched
+- what happened during the run
+- what error messages appeared if something failed
+
+Typical files per run:
+- metadata JSON with command and status
+- main `.log` file with normal progress output
+- `.error.log` file with stderr and traceback output
 
 ### CRM scoring optimization behavior
 

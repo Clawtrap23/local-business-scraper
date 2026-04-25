@@ -851,9 +851,20 @@ Run once:
 
 This is the main discovery workflow.
 
+### Exact command to run it
+
+From the project folder:
+
 ```bash
+cd /home/profile1/.openclaw/workspace/projects/local-business-scraper
 source /home/profile1/miniconda3/etc/profile.d/conda.sh
 conda activate local-business-scraper
+python run.py tradies --total-per-query 8
+```
+
+If you want the simplest form while already inside the project and environment:
+
+```bash
 python run.py tradies --total-per-query 8
 ```
 
